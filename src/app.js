@@ -404,9 +404,7 @@ function startJourney() {
   startupSound.volume = 1;
   currentStartupSound = startupSound;
 
-  const STARTUP_DURATION_MS = 8450;
-  const startTime = Date.now();
-
+  const STARTUP_DURATION_MS = 8000;
   const progressInterval = setInterval(() => {
     if (hasFinished) {
       clearInterval(progressInterval);
@@ -414,6 +412,12 @@ function startJourney() {
     }
     updateLoadingProgress();
   }, 200);
+
+  startupSound.addEventListener('ended', () => {
+    clearInterval(progressInterval);
+    preloadStatus.minTimerPassed = true;
+    checkAllLoadedAndFinish();
+  }, { once: true });
 
   state.startTimer = setTimeout(() => {
     clearInterval(progressInterval);
