@@ -15,8 +15,10 @@
     <main id="app" class="app intro-active" aria-live="polite">
       <div class="scene" aria-hidden="true">
         <img class="fallback" src="./assets/images/ksrtc-journey-fallback.png" alt="" />
-        <video id="journey-video" muted loop playsinline preload="metadata"></video>
-        <video id="scene-video" muted playsinline preload="metadata"></video>
+        <video id="journey-video" muted loop playsinline preload="auto"></video>
+        <video id="rain-video" muted loop playsinline preload="auto"></video>
+        <video id="stop-video" muted playsinline preload="auto"></video>
+        <video id="scene-video" muted playsinline preload="metadata" hidden></video>
       </div>
       <div class="vignette" aria-hidden="true"></div>
 
@@ -66,8 +68,8 @@
           </div>
           <p class="eyebrow">✦ KERALA STATE ROAD TRANSPORT CORPORATION ✦</p>
           <h2>Starting your journey</h2>
-          <div class="loading-track"><span></span></div>
-          <p class="loading-note">Starting the engine • Next stop: Nostalgia…</p>
+          <div class="loading-track"><span id="loading-bar"></span></div>
+          <p class="loading-note" id="loading-status">Starting the engine • Next stop: Nostalgia…</p>
         </div>
       </section>
 

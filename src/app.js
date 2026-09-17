@@ -14,7 +14,8 @@ shuffle(playlist);
 const $ = (id) => document.getElementById(id);
 const state = { isJourneyStarted:false, isRainMode:false, isStopping:false, currentVideo:'journey', currentSongIndex:0, isPlaying:false, currentTime:0, duration:0, startTimer:null, unblurTimer:null };
 const app = $('app');
-const journey = $('journey-video'), scene = $('scene-video');
+const journey = $('journey-video'), rainVideo = $('rain-video'), stopVideo = $('stop-video'), scene = $('scene-video');
+const loadingBar = $('loading-bar'), loadingStatus = $('loading-status');
 const els = { intro:$('intro'), player:$('player'), start:$('start-journey'), replay:$('replay'), album:$('album-art'), title:$('track-title'), artist:$('track-artist'), progress:$('progress'), current:$('current-time'), duration:$('duration'), play:$('play'), previous:$('previous'), next:$('next'), stop:$('make-stop'), rain:$('rain'), horn:$('horn'), bell:$('bell'), toast:$('toast'), brand:document.querySelector('.brand') };
 
 // Initialize first track metadata in DOM
@@ -30,11 +31,88 @@ const runAudio = new Audio(journeyConfig.sounds.run);
 runAudio.loop = true;
 runAudio.volume = journeyConfig.volumes.run ?? 0.3;
 
-journey.src = journeyConfig.videos.journey;
-journey.preload = 'auto';
-journey.loop = true;
-journey.load();
-journey.addEventListener('error',()=>notify('That video could not be loaded. The journey image remains available.'));
+const preloadStatus = {
+  journey: false,
+  rain: false,
+  stop: false,
+  ytSong: false,
+  minTimerPassed: false
+};
+let isPreloadingYT = false;
+let ytSongBuffered = false;
+let hasFinished = false;
+
+function updateLoadingProgress() {
+  let percent = 0;
+  if (preloadStatus.journey) percent += 25;
+  if (preloadStatus.rain) percent += 20;
+  if (preloadStatus.stop) percent += 20;
+  if (preloadStatus.ytSong) percent += 20;
+  if (preloadStatus.minTimerPassed) percent += 15;
+
+  const currentW = Math.min(percent, 100);
+  if (loadingBar) {
+    loadingBar.style.setProperty('--loading-progress', `${currentW}%`);
+    loadingBar.style.width = `${currentW}%`;
+  }
+
+  if (loadingStatus && els.intro.classList.contains('is-starting')) {
+    if (currentW >= 100) {
+      loadingStatus.textContent = 'All aboard! Welcome aboard KSRTC Radio…';
+    } else if (!preloadStatus.journey || !preloadStatus.rain || !preloadStatus.stop) {
+      loadingStatus.textContent = 'Buffering scenic road videos & windshield view…';
+    } else if (!preloadStatus.ytSong) {
+      loadingStatus.textContent = 'Tuning into KSRTC Malayalam Radio…';
+    } else {
+      loadingStatus.textContent = 'Starting the engine • Next stop: Nostalgia…';
+    }
+  }
+}
+
+function checkAllLoadedAndFinish() {
+  if (!state.isJourneyStarted || hasFinished) return;
+  updateLoadingProgress();
+  const allMediaReady = preloadStatus.journey && preloadStatus.rain && preloadStatus.stop && preloadStatus.ytSong;
+  if (allMediaReady && preloadStatus.minTimerPassed) {
+    finishLoading();
+  }
+}
+
+function setupVideoPreload(videoEl, src, key) {
+  if (!videoEl || !src) {
+    preloadStatus[key] = true;
+    updateLoadingProgress();
+    return;
+  }
+  videoEl.src = src;
+  videoEl.preload = 'auto';
+
+  const markReady = () => {
+    if (!preloadStatus[key]) {
+      preloadStatus[key] = true;
+      updateLoadingProgress();
+      checkAllLoadedAndFinish();
+    }
+  };
+
+  if (videoEl.readyState >= 3) {
+    markReady();
+  } else {
+    videoEl.addEventListener('canplay', markReady, { once: true });
+    videoEl.addEventListener('canplaythrough', markReady, { once: true });
+    videoEl.addEventListener('loadeddata', markReady, { once: true });
+    videoEl.addEventListener('error', () => {
+      console.warn(`Video ${key} preload warning: using available fallback`);
+      markReady();
+    }, { once: true });
+  }
+  videoEl.load();
+}
+
+// Preload all 3 videos immediately
+setupVideoPreload(journey, journeyConfig.videos.journey, 'journey');
+setupVideoPreload(rainVideo, journeyConfig.videos.rain, 'rain');
+setupVideoPreload(stopVideo, journeyConfig.videos.stop, 'stop');
 
 let ytPlayer = null;
 let ytReady = false;
@@ -63,13 +141,34 @@ function initYTPlayer() {
           try {
             if (ytPlayer.unMute) ytPlayer.unMute();
             if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+            ytPlayer.cueVideoById(playlist[0].id);
           } catch (e) {}
+          if (isPreloadingYT && !preloadStatus.ytSong) {
+            startYTPreload();
+          }
           if (pendingTrack !== null) {
             setTrack(pendingTrack.index, pendingTrack.shouldPlay);
             pendingTrack = null;
           }
         },
         onStateChange: (event) => {
+          if (isPreloadingYT && (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING)) {
+            if (event.data === YT.PlayerState.PLAYING) {
+              isPreloadingYT = false;
+              ytSongBuffered = true;
+              preloadStatus.ytSong = true;
+              try {
+                ytPlayer.pauseVideo();
+                ytPlayer.seekTo(0, true);
+                ytPlayer.unMute();
+                if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+              } catch (e) {}
+              updateLoadingProgress();
+              checkAllLoadedAndFinish();
+            }
+            return;
+          }
+
           if (event.data === YT.PlayerState.PLAYING) {
             state.isPlaying = true;
             els.play.classList.add('is-playing');
@@ -87,14 +186,34 @@ function initYTPlayer() {
           }
         },
         onError: (err) => {
-          console.warn('YouTube playback error, skipping to next track:', err);
-          notify('Track skipped…');
-          setTimeout(() => setTrack(state.currentSongIndex + 1, true), 1000);
+          console.warn('YouTube playback error, fallback to ready:', err);
+          isPreloadingYT = false;
+          preloadStatus.ytSong = true;
+          updateLoadingProgress();
+          checkAllLoadedAndFinish();
         }
       }
     });
   } catch (err) {
     console.error('Error creating YouTube player:', err);
+    preloadStatus.ytSong = true;
+    updateLoadingProgress();
+  }
+}
+
+function startYTPreload() {
+  if (preloadStatus.ytSong) return;
+  isPreloadingYT = true;
+  if (ytPlayer && ytReady && ytPlayer.loadVideoById) {
+    try {
+      ytPlayer.mute();
+      ytPlayer.loadVideoById(playlist[0].id);
+      ytPlayer.playVideo();
+    } catch (e) {
+      preloadStatus.ytSong = true;
+      updateLoadingProgress();
+      checkAllLoadedAndFinish();
+    }
   }
 }
 
@@ -208,24 +327,6 @@ function pauseMusic() {
     ytPlayer.pauseVideo();
   }
 }
-function loadVideo(video, src, loop) {
-  video.pause(); video.classList.remove('is-visible'); video.loop=loop; video.src=src; video.load();
-  video.addEventListener('canplay',()=>{ video.classList.add('is-visible'); playSafe(video); },{once:true});
-  video.addEventListener('error',()=>notify('That video could not be loaded. The journey image remains available.'),{once:true});
-}
-function swapScene(kind, loop=true) {
-  scene.dataset.kind = kind;
-  scene.classList.toggle('is-rain', kind === 'rain');
-  loadVideo(scene,journeyConfig.videos[kind],loop);
-  state.currentVideo=kind;
-}
-function returnJourney() {
-  scene.pause();
-  scene.classList.remove('is-visible', 'is-rain');
-  delete scene.dataset.kind;
-  state.currentVideo='journey';
-  if(!state.isRainMode) playSafe(journey);
-}
 function toggleRain() {
   if (state.isStopping) return;
   state.isRainMode = !state.isRainMode;
@@ -234,7 +335,11 @@ function toggleRain() {
   els.rain.setAttribute('aria-label', state.isRainMode ? 'Turn rain off' : 'Turn rain on');
   if (state.isRainMode) {
     journey.pause();
-    swapScene('rain', true);
+    journey.classList.remove('is-visible');
+    rainVideo.currentTime = 0;
+    rainVideo.classList.add('is-visible');
+    playSafe(rainVideo);
+    state.currentVideo = 'rain';
     rainAudio.volume = journeyConfig.volumes.rain ?? 0.7;
     rainAudio.currentTime = 0;
     syncRainAudio();
@@ -242,15 +347,16 @@ function toggleRain() {
   } else {
     rainAudio.pause();
     rainAudio.currentTime = 0;
-    scene.pause();
-    scene.classList.remove('is-visible', 'is-rain');
-    delete scene.dataset.kind;
+    rainVideo.pause();
+    rainVideo.classList.remove('is-visible');
+    journey.classList.add('is-visible');
     playSafe(journey);
     state.currentVideo = 'journey';
     notify('Rain off.');
   }
   syncRunAudio();
 }
+
 function makeStop() {
   if (state.isStopping) return;
   if (state.isRainMode) {
@@ -265,7 +371,11 @@ function makeStop() {
   if (label) label.textContent = 'Stopping…';
   effect(journeyConfig.sounds.busBell);
   journey.pause();
-  swapScene('stop', false);
+  journey.classList.remove('is-visible');
+  stopVideo.currentTime = 0;
+  stopVideo.classList.add('is-visible');
+  playSafe(stopVideo);
+  state.currentVideo = 'stop';
   notify('Stopping at the next stop…');
 }
 
@@ -274,62 +384,102 @@ let currentStartupSound = null;
 function startJourney() {
   if (state.isJourneyStarted) return;
   state.isJourneyStarted = true;
+  hasFinished = false;
   els.start.disabled = true;
   els.intro.classList.add('is-starting');
-  if (ytPlayer && ytReady && ytPlayer.playVideo) {
-    try {
-      ytPlayer.mute();
-      ytPlayer.playVideo();
-      setTimeout(() => {
-        if (!state.isJourneyStarted || els.player.hidden) {
-          ytPlayer.pauseVideo();
-          ytPlayer.unMute();
-          if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
-          ytPlayer.seekTo(0, true);
-        }
-      }, 80);
-    } catch (e) {}
-  }
+
+  // Trigger YouTube first track pre-buffering
+  startYTPreload();
+
+  // Safety fallback for YouTube: if slow or throttled, don't stall forever
+  setTimeout(() => {
+    if (!preloadStatus.ytSong) {
+      preloadStatus.ytSong = true;
+      updateLoadingProgress();
+      checkAllLoadedAndFinish();
+    }
+  }, 7000);
+
   const startupSound = effect(journeyConfig.sounds.journeyStart);
   startupSound.volume = 1;
   currentStartupSound = startupSound;
 
   const STARTUP_DURATION_MS = 8450;
-  let hasFinished = false;
+  const startTime = Date.now();
 
-  const finishLoading = () => {
-    if (hasFinished) return;
-    hasFinished = true;
-    clearTimeout(state.startTimer);
-    try {
-      startupSound.pause();
-      startupSound.currentTime = 0;
-    } catch (e) {}
-    currentStartupSound = null;
-    journey.classList.add('is-visible');
-    playSafe(journey);
-    els.intro.classList.remove('is-starting');
-    els.intro.classList.add('is-unblurring');
-    app.classList.remove('intro-active');
-    els.player.hidden = false;
-    els.replay.hidden = false;
-    setTrack(0, true);
-    syncRunAudio();
-    syncRainAudio();
-    els.player.classList.remove('ui-blur-in');
-    els.replay.classList.remove('ui-blur-in');
-    els.brand.classList.remove('ui-blur-in');
-    void els.player.offsetWidth;
-    els.player.classList.add('ui-blur-in');
-    els.replay.classList.add('ui-blur-in');
-    els.brand.classList.add('ui-blur-in');
-    state.unblurTimer = setTimeout(() => {
-      els.intro.classList.remove('is-unblurring');
-      els.intro.classList.add('is-hidden');
-    }, 1000);
-  };
-  state.startTimer = setTimeout(finishLoading, STARTUP_DURATION_MS);
+  const progressInterval = setInterval(() => {
+    if (hasFinished) {
+      clearInterval(progressInterval);
+      return;
+    }
+    updateLoadingProgress();
+  }, 200);
+
+  state.startTimer = setTimeout(() => {
+    clearInterval(progressInterval);
+    preloadStatus.minTimerPassed = true;
+    checkAllLoadedAndFinish();
+  }, STARTUP_DURATION_MS);
+
+  // Absolute safety timeout: never hang forever (max 20 seconds)
+  setTimeout(() => {
+    if (!hasFinished) {
+      preloadStatus.journey = true;
+      preloadStatus.rain = true;
+      preloadStatus.stop = true;
+      preloadStatus.ytSong = true;
+      preloadStatus.minTimerPassed = true;
+      finishLoading();
+    }
+  }, 20000);
 }
+
+const finishLoading = () => {
+  if (hasFinished) return;
+  hasFinished = true;
+  clearTimeout(state.startTimer);
+  try {
+    if (currentStartupSound) {
+      currentStartupSound.pause();
+      currentStartupSound.currentTime = 0;
+    }
+  } catch (e) {}
+  currentStartupSound = null;
+
+  if (loadingBar) {
+    loadingBar.style.width = '100%';
+    loadingBar.style.setProperty('--loading-progress', '100%');
+  }
+  if (loadingStatus) {
+    loadingStatus.textContent = 'All aboard! Welcome aboard KSRTC Radio…';
+  }
+
+  journey.classList.add('is-visible');
+  playSafe(journey);
+
+  els.intro.classList.remove('is-starting');
+  els.intro.classList.add('is-unblurring');
+  app.classList.remove('intro-active');
+  els.player.hidden = false;
+  els.replay.hidden = false;
+
+  setTrack(0, true);
+  syncRunAudio();
+  syncRainAudio();
+
+  els.player.classList.remove('ui-blur-in');
+  els.replay.classList.remove('ui-blur-in');
+  els.brand.classList.remove('ui-blur-in');
+  void els.player.offsetWidth;
+  els.player.classList.add('ui-blur-in');
+  els.replay.classList.add('ui-blur-in');
+  els.brand.classList.add('ui-blur-in');
+
+  state.unblurTimer = setTimeout(() => {
+    els.intro.classList.remove('is-unblurring');
+    els.intro.classList.add('is-hidden');
+  }, 1000);
+};
 
 function resetJourney() {
   clearTimeout(state.startTimer);
@@ -353,11 +503,12 @@ function resetJourney() {
   if (ytPlayer && ytReady && ytPlayer.seekTo) {
     ytPlayer.seekTo(0, true);
   }
-  scene.pause();
-  scene.removeAttribute('src');
-  scene.load();
-  scene.classList.remove('is-visible', 'is-rain');
-  delete scene.dataset.kind;
+  stopVideo.pause();
+  stopVideo.currentTime = 0;
+  stopVideo.classList.remove('is-visible');
+  rainVideo.pause();
+  rainVideo.currentTime = 0;
+  rainVideo.classList.remove('is-visible');
   journey.pause();
   journey.currentTime = 0;
   journey.classList.remove('is-visible');
@@ -394,6 +545,12 @@ function resetJourney() {
   els.intro.classList.remove('is-hidden', 'is-starting', 'is-unblurring');
   app.classList.add('intro-active');
   els.start.disabled = false;
+  hasFinished = false;
+  preloadStatus.minTimerPassed = false;
+  if (loadingBar) {
+    loadingBar.style.width = '0%';
+    loadingBar.style.setProperty('--loading-progress', '0%');
+  }
 }
 
 // Track seek & progress polling from YouTube player
@@ -454,18 +611,24 @@ els.bell.addEventListener('click', triggerBell);
 els.rain.addEventListener('click', toggleRain);
 els.stop.addEventListener('click', makeStop);
 
-scene.addEventListener('ended', () => {
+function onStopEnded() {
   if (state.isStopping) {
     state.isStopping = false;
     els.stop.disabled = false;
     els.stop.classList.remove('is-stopping');
     const stopLabel = els.stop.querySelector('small');
     if (stopLabel) stopLabel.textContent = 'Make a Stop';
-    returnJourney();
+    stopVideo.pause();
+    stopVideo.classList.remove('is-visible');
+    journey.classList.add('is-visible');
+    playSafe(journey);
+    state.currentVideo = 'journey';
     syncRunAudio();
     notify('Journey resumed.');
   }
-});
+}
+stopVideo.addEventListener('ended', onStopEnded);
+scene.addEventListener('ended', onStopEnded);
 
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input')) return;
