@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#10100e" />
+    <title>KSRTC Radio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <link rel="icon" type="image/png" href="./src/favicon.png" />
+  </head>
+  <body>
+    <main id="app" class="app intro-active" aria-live="polite">
+      <div class="scene" aria-hidden="true">
+        <img class="fallback" src="./assets/images/ksrtc-journey-fallback.png" alt="" />
+        <video id="journey-video" muted loop playsinline preload="metadata"></video>
+        <video id="scene-video" muted playsinline preload="metadata"></video>
+      </div>
+      <div class="vignette" aria-hidden="true"></div>
+
+      <header class="brand" aria-label="KSRTC Radio">
+        <span class="crest"><img src="https://upload.wikimedia.org/wikipedia/en/7/71/Kerala_State_Road_Transport_Corporation_logo.png" alt="Kerala State Road Transport Corporation logo" /></span><span>KSRTC RADIO</span>
+      </header>
+
+      <section class="intro" id="intro" aria-label="Start your journey">
+        <div class="welcome-copy">
+          <div class="intro-seal"><img src="https://upload.wikimedia.org/wikipedia/en/7/71/Kerala_State_Road_Transport_Corporation_logo.png" alt="Kerala State Road Transport Corporation logo" /></div>
+          <p class="intro-title">KSRTC RADIO</p>
+          <p class="intro-tagline">MUSIC <b>•</b> ROADS <b>•</b> MEMORIES</p>
+          <span class="intro-rule" aria-hidden="true"></span>
+          <h1>Welcome aboard.</h1>
+          <p class="intro-subtitle">Your journey begins here.</p>
+          <button class="start-button" id="start-journey">Start journey <span>→</span></button>
+        </div>
+        <div class="journey-loading" aria-live="polite" aria-label="Starting your journey">
+          <div class="kerala-horizon">
+            <div class="horizon-sky"></div>
+            <div class="horizon-hills"></div>
+            <i class="palm p1"></i>
+            <i class="palm p2"></i>
+            <i class="palm p3"></i>
+            <i class="palm p4"></i>
+            <div class="horizon-road"></div>
+          </div>
+          <div class="bus-start">
+            <div class="bus-roof-rack"></div>
+            <div class="bus-dest-board">KSRTC • FAST PASSENGER</div>
+            <div class="windshield">
+              <span class="wiper left"></span><span class="wiper right"></span>
+              <span class="route-board">ആനവണ്ടി</span>
+            </div>
+            <div class="bus-grill">
+              <span class="bus-crest-mini"></span>
+              <span class="grill-slats"></span>
+            </div>
+            <span class="bus-light left"><i class="light-beam"></i></span>
+            <span class="bus-light right"><i class="light-beam"></i></span>
+            <span class="bus-bumper"></span>
+            <span class="wheel left"></span>
+            <span class="wheel right"></span>
+          </div>
+          <div class="engine-lines">
+            <i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <p class="eyebrow">✦ KERALA STATE ROAD TRANSPORT CORPORATION ✦</p>
+          <h2>Starting your journey</h2>
+          <div class="loading-track"><span></span></div>
+          <p class="loading-note">Starting the engine • Next stop: Nostalgia…</p>
+        </div>
+      </section>
+
+      <section class="player" id="player" aria-label="Music player" hidden>
+        <div class="now-playing">
+          <div class="album-art">
+            <img id="album-art" src="https://img.youtube.com/vi/IL4H0erw0Bk/hqdefault.jpg" alt="Album art" />
+            <span class="player-logo-badge" title="Kerala State Road Transport Corporation">
+              <img src="https://upload.wikimedia.org/wikipedia/en/7/71/Kerala_State_Road_Transport_Corporation_logo.png" alt="KSRTC logo" />
+            </span>
+          </div>
+          <div class="track-meta">
+            <div class="track-title" id="track-title">Chirimanimulle</div>
+            <div class="track-artist" id="track-artist">Lion (Malayalam Movie)</div>
+            <input id="progress" class="progress" aria-label="Seek song" type="range" min="0" max="100" value="0" />
+            <div class="time-row"><span id="current-time">0:00</span><span id="duration">0:00</span></div>
+          </div>
+        </div>
+        <nav class="controls" aria-label="Journey controls">
+          <button class="circle-action stop-action" id="make-stop" aria-label="Make a stop">
+            <span class="icon">
+              <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 9.5C6 7.2 7.8 6 11 6h4c3.2 0 5 1.2 5 3.5v12.5c0 1.2-.8 1.8-1.8 1.8v1.7a1.5 1.5 0 0 1-3 0v-1.7h-3v1.7a1.5 1.5 0 0 1-3 0v-1.7C7 23.8 6 23.2 6 22V9.5zm2.2.5h7.6c.5 0 .8.3.8.8v3.4H7.4v-3.4c0-.5.3-.8.8-.8zm.5 8.8a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zm6.6 0a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6z"/><path d="M22.8 7.5h3.4c.8 0 1.3.5 1.3 1.3v5.4c0 .8-.5 1.3-1.3 1.3h-3.4v8.5h2v1.5h-5.5V24h2V7.5z"/></svg>
+            </span>
+            <small>Make a Stop</small>
+          </button>
+          <button class="circle-action" id="horn" aria-label="Sound horn">
+            <span class="icon">
+              <svg class="icon-normal" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 11c.7 0 1.6 1.3 2 2.7h3.8c1-2.2 3.1-3.7 5.7-3.7 3.3 0 6 2.2 6 5l3.5-4c.6-.7 1.8-.4 1.8.8v8.4c0 1.2-1.2 1.5-1.8.8l-3.5-4c0 2.8-2.7 5-6 5-2.6 0-4.7-1.5-5.7-3.7H6c-.4 1.4-1.3 2.7-2 2.7-.8 0-1-.9-1-1.8v-7.4C3 11.9 3.2 11 4 11zm11.5 2c-1.7 0-3 1.3-3 3s1.3 3 3 3 3-1.3 3-3-1.3-3-3-3z"/></svg>
+              <svg class="icon-pressed" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 11.5c.7 0 1.5 1.2 1.8 2.5h3.4c.9-2 2.8-3.5 5.1-3.5 3 0 5.4 2 5.4 4.5l3.1-3.6c.5-.6 1.6-.3 1.6.7v7.6c0 1-1.1 1.3-1.6.7l-3.1-3.6c0 2.5-2.4 4.5-5.4 4.5-2.3 0-4.2-1.4-5.1-3.5H4.8c-.3 1.3-1.1 2.5-1.8 2.5-.7 0-.9-.8-.9-1.6v-6.6c0-.8.2-1.6.9-1.6zm10.3 1.8c-1.5 0-2.7 1.2-2.7 2.7s1.2 2.7 2.7 2.7 2.7-1.2 2.7-2.7-1.2-2.7-2.7-2.7z"/><path d="M24 13.5c1.1.8 1.8 1.8 1.8 2.8s-.7 2-1.8 2.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M26.5 11c2 1.4 3.2 3.1 3.2 5s-1.2 3.6-3.2 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </span>
+            <small>Horn</small>
+          </button>
+          <button class="transport previous" id="previous" aria-label="Previous song"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.5 5v14M15.5 7.4 7 12l8.5 4.6z"/></svg></button>
+          <button class="play" id="play" aria-label="Play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6z"/></svg></button>
+          <button class="transport" id="next" aria-label="Next song"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 5v14M8.5 7.4 17 12l-8.5 4.6z"/></svg></button>
+          <button class="circle-action rain-action" id="rain" aria-label="Turn rain on">
+            <span class="icon">
+              <svg class="icon-rain-active" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 18.5c-2.2 0-4-1.8-4-4 0-2 1.4-3.6 3.3-3.9.7-2.6 3-4.6 5.9-4.6 3 0 5.5 2.2 6 5.1.4-.1.8-.2 1.3-.2 1.9 0 3.5 1.6 3.5 3.6 0 2.2-1.8 4-4 4z"/><path d="M9.5 21.2l-1.5 2.4a1 1 0 0 0 1.7 1l1.5-2.4a1 1 0 0 0-1.7-1zm6 0l-1.5 2.4a1 1 0 0 0 1.7 1l1.5-2.4a1 1 0 0 0-1.7-1zm6 0l-1.5 2.4a1 1 0 0 0 1.7 1l1.5-2.4a1 1 0 0 0-1.7-1zm-9 4.8l-1.5 2.4a1 1 0 0 0 1.7 1l1.5-2.4a1 1 0 0 0-1.7-1zm6 0l-1.5 2.4a1 1 0 0 0 1.7 1l1.5-2.4a1 1 0 0 0-1.7-1z"/></svg>
+              <svg class="icon-rain-slash" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 18.5c-2.2 0-4-1.8-4-4 0-2 1.4-3.6 3.3-3.9.7-2.6 3-4.6 5.9-4.6 3 0 5.5 2.2 6 5.1.4-.1.8-.2 1.3-.2 1.9 0 3.5 1.6 3.5 3.6 0 2.2-1.8 4-4 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><line x1="7" y1="23.5" x2="25" y2="7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            </span>
+            <small>Rain Off</small>
+          </button>
+          <button class="circle-action" id="bell" aria-label="Ring bus bell">
+            <span class="icon">
+              <svg class="icon-normal" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 5.5c.8 0 1.5.7 1.5 1.5v.6c3.7.7 6.5 3.7 6.5 7.9v4.5c0 1.3.8 2.3 1.8 2.9.4.2.5.7.2 1.1-.2.3-.6.5-1 .5H7c-.4 0-.8-.2-1-.5-.3-.4-.2-.9.2-1.1 1-.6 1.8-1.6 1.8-2.9v-4.5c0-4.2 2.8-7.2 6.5-7.9V7c0-.8.7-1.5 1.5-1.5zm-2.5 20.5c.3 1.4 1.3 2.5 2.5 2.5s2.2-1.1 2.5-2.5z"/></svg>
+              <svg class="icon-pressed" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 5.5c.8 0 1.5.7 1.5 1.5v.6c3.7.7 6.5 3.7 6.5 7.9v4.5c0 1.3.8 2.3 1.8 2.9.4.2.5.7.2 1.1-.2.3-.6.5-1 .5H7c-.4 0-.8-.2-1-.5-.3-.4-.2-.9.2-1.1 1-.6 1.8-1.6 1.8-2.9v-4.5c0-4.2 2.8-7.2 6.5-7.9V7c0-.8.7-1.5 1.5-1.5zm-2.5 20.5c.3 1.4 1.3 2.5 2.5 2.5s2.2-1.1 2.5-2.5z"/><path d="M5 13.5c-.9 1.4-.9 3.6 0 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2.5 11.5c-1.5 2.5-1.5 6.5 0 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M27 13.5c.9 1.4.9 3.6 0 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M29.5 11.5c1.5 2.5 1.5 6.5 0 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </span>
+            <small>Bus Bell</small>
+          </button>
+        </nav>
+      </section>
+
+      <div id="yt-player-wrap" style="position:fixed;bottom:0;right:0;width:200px;height:200px;opacity:1;pointer-events:none;z-index:-999;"><div id="yt-player"></div></div>
+      <button id="replay" class="replay" aria-label="Replay journey introduction" hidden>↺</button>
+      <div id="toast" class="toast" role="status"></div>
+    </main>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

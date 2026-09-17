@@ -1,0 +1,11 @@
+{
+  "name": "ksrtc-radio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/server.mjs",
+    "verify": "node scripts/verify.mjs",
+    "build": "node scripts/verify.mjs"
+  }
+}

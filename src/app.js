@@ -1,0 +1,478 @@
+import { journeyConfig, playlist } from './config.js';
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// Always shuffle playlist whenever refreshed or loaded
+shuffle(playlist);
+
+const $ = (id) => document.getElementById(id);
+const state = { isJourneyStarted:false, isRainMode:false, isStopping:false, currentVideo:'journey', currentSongIndex:0, isPlaying:false, currentTime:0, duration:0, startTimer:null, unblurTimer:null };
+const app = $('app');
+const journey = $('journey-video'), scene = $('scene-video');
+const els = { intro:$('intro'), player:$('player'), start:$('start-journey'), replay:$('replay'), album:$('album-art'), title:$('track-title'), artist:$('track-artist'), progress:$('progress'), current:$('current-time'), duration:$('duration'), play:$('play'), previous:$('previous'), next:$('next'), stop:$('make-stop'), rain:$('rain'), horn:$('horn'), bell:$('bell'), toast:$('toast'), brand:document.querySelector('.brand') };
+
+// Initialize first track metadata in DOM
+els.title.textContent = playlist[0].title;
+els.artist.textContent = playlist[0].artist;
+els.album.src = playlist[0].albumArt;
+
+const rainAudio = new Audio(journeyConfig.sounds.rain);
+rainAudio.loop = true;
+rainAudio.volume = journeyConfig.volumes.rain ?? 0.7;
+
+const runAudio = new Audio(journeyConfig.sounds.run);
+runAudio.loop = true;
+runAudio.volume = journeyConfig.volumes.run ?? 0.3;
+
+journey.src = journeyConfig.videos.journey;
+journey.preload = 'auto';
+journey.loop = true;
+journey.load();
+journey.addEventListener('error',()=>notify('That video could not be loaded. The journey image remains available.'));
+
+let ytPlayer = null;
+let ytReady = false;
+let pendingTrack = null;
+
+function initYTPlayer() {
+  if (ytPlayer || !window.YT || !window.YT.Player) return;
+  try {
+    ytPlayer = new YT.Player('yt-player', {
+      height: '200',
+      width: '200',
+      videoId: playlist[0].id,
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        rel: 0,
+        playsinline: 1,
+        enablejsapi: 1,
+        origin: window.location.origin
+      },
+      events: {
+        onReady: () => {
+          ytReady = true;
+          try {
+            if (ytPlayer.unMute) ytPlayer.unMute();
+            if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+          } catch (e) {}
+          if (pendingTrack !== null) {
+            setTrack(pendingTrack.index, pendingTrack.shouldPlay);
+            pendingTrack = null;
+          }
+        },
+        onStateChange: (event) => {
+          if (event.data === YT.PlayerState.PLAYING) {
+            state.isPlaying = true;
+            els.play.classList.add('is-playing');
+            els.play.setAttribute('aria-label', 'Pause');
+            syncRunAudio();
+            syncRainAudio();
+          } else if (event.data === YT.PlayerState.PAUSED) {
+            state.isPlaying = false;
+            els.play.classList.remove('is-playing');
+            els.play.setAttribute('aria-label', 'Play');
+            syncRunAudio();
+            syncRainAudio();
+          } else if (event.data === YT.PlayerState.ENDED) {
+            setTrack(state.currentSongIndex + 1, true);
+          }
+        },
+        onError: (err) => {
+          console.warn('YouTube playback error, skipping to next track:', err);
+          notify('Track skipped…');
+          setTimeout(() => setTrack(state.currentSongIndex + 1, true), 1000);
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Error creating YouTube player:', err);
+  }
+}
+
+if (window.YT && window.YT.Player) {
+  initYTPlayer();
+} else {
+  const prevReady = window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady = () => {
+    if (typeof prevReady === 'function') prevReady();
+    initYTPlayer();
+  };
+}
+
+const ytInitInterval = setInterval(() => {
+  if (window.YT && window.YT.Player) {
+    if (!ytPlayer) initYTPlayer();
+    clearInterval(ytInitInterval);
+  }
+}, 200);
+setTimeout(() => clearInterval(ytInitInterval), 10000);
+
+function formatTime(seconds) { if (!Number.isFinite(seconds)) return '0:00'; return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`; }
+function notify(message) { els.toast.textContent=message; els.toast.classList.add('show'); clearTimeout(notify.timer); notify.timer=setTimeout(()=>els.toast.classList.remove('show'),2200); }
+function playSafe(media, label) { return media.play().catch(()=> label && notify(`${label} is ready when its file is added.`)); }
+function effect(path) { const sound=new Audio(path); sound.volume=journeyConfig.volumes.effects; sound.play().catch(()=>notify('Sound effect is ready when its file is added.')); return sound; }
+
+function syncRunAudio() {
+  const shouldPlay = state.isJourneyStarted && !els.player.hidden && !state.isStopping && state.isPlaying;
+  if (shouldPlay) {
+    if (runAudio.paused) {
+      playSafe(runAudio, 'Bus running sound');
+    }
+  } else {
+    if (!runAudio.paused) {
+      runAudio.pause();
+    }
+  }
+}
+
+function syncRainAudio() {
+  const shouldPlay = state.isJourneyStarted && !els.player.hidden && state.isRainMode && state.isPlaying;
+  if (shouldPlay) {
+    if (rainAudio.paused) {
+      playSafe(rainAudio, 'Rain sound');
+    }
+  } else {
+    if (!rainAudio.paused) {
+      rainAudio.pause();
+    }
+  }
+}
+
+function setTrack(index, shouldPlay=state.isPlaying) {
+  state.currentSongIndex=(index+playlist.length)%playlist.length;
+  const track=playlist[state.currentSongIndex];
+  els.title.textContent=track.title;
+  els.artist.textContent=track.artist;
+  els.album.src=track.albumArt;
+  els.album.onerror=()=>{els.album.src=journeyConfig.videos.fallbackImage;};
+  els.progress.value=0;
+  els.progress.style.setProperty('--progress','0%');
+  els.current.textContent='0:00';
+  els.duration.textContent='0:00';
+
+  if (!ytReady || !ytPlayer || !ytPlayer.loadVideoById) {
+    pendingTrack = { index: state.currentSongIndex, shouldPlay };
+    return;
+  }
+  try {
+    if (ytPlayer.unMute) ytPlayer.unMute();
+    if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+    if (shouldPlay) {
+      ytPlayer.loadVideoById(track.id);
+      state.isPlaying = true;
+      els.play.classList.add('is-playing');
+      els.play.setAttribute('aria-label', 'Pause');
+    } else {
+      ytPlayer.cueVideoById(track.id);
+    }
+  } catch (err) {
+    console.error('Error updating track:', err);
+  }
+}
+
+function playMusic() {
+  state.isPlaying=true;
+  els.play.classList.add('is-playing');
+  els.play.setAttribute('aria-label','Pause');
+  syncRunAudio();
+  syncRainAudio();
+  if (ytPlayer && ytReady && ytPlayer.playVideo) {
+    try {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+      ytPlayer.playVideo();
+    } catch (e) {
+      setTrack(state.currentSongIndex, true);
+    }
+  } else {
+    setTrack(state.currentSongIndex, true);
+  }
+}
+
+function pauseMusic() {
+  state.isPlaying=false;
+  els.play.classList.remove('is-playing');
+  els.play.setAttribute('aria-label','Play');
+  syncRunAudio();
+  syncRainAudio();
+  if (ytPlayer && ytReady && ytPlayer.pauseVideo) {
+    ytPlayer.pauseVideo();
+  }
+}
+function loadVideo(video, src, loop) {
+  video.pause(); video.classList.remove('is-visible'); video.loop=loop; video.src=src; video.load();
+  video.addEventListener('canplay',()=>{ video.classList.add('is-visible'); playSafe(video); },{once:true});
+  video.addEventListener('error',()=>notify('That video could not be loaded. The journey image remains available.'),{once:true});
+}
+function swapScene(kind, loop=true) {
+  scene.dataset.kind = kind;
+  scene.classList.toggle('is-rain', kind === 'rain');
+  loadVideo(scene,journeyConfig.videos[kind],loop);
+  state.currentVideo=kind;
+}
+function returnJourney() {
+  scene.pause();
+  scene.classList.remove('is-visible', 'is-rain');
+  delete scene.dataset.kind;
+  state.currentVideo='journey';
+  if(!state.isRainMode) playSafe(journey);
+}
+function toggleRain() {
+  if (state.isStopping) return;
+  state.isRainMode = !state.isRainMode;
+  els.rain.classList.toggle('active', state.isRainMode);
+  els.rain.querySelector('small').textContent = state.isRainMode ? 'Rain On' : 'Rain Off';
+  els.rain.setAttribute('aria-label', state.isRainMode ? 'Turn rain off' : 'Turn rain on');
+  if (state.isRainMode) {
+    journey.pause();
+    swapScene('rain', true);
+    rainAudio.volume = journeyConfig.volumes.rain ?? 0.7;
+    rainAudio.currentTime = 0;
+    syncRainAudio();
+    notify('Rain on.');
+  } else {
+    rainAudio.pause();
+    rainAudio.currentTime = 0;
+    scene.pause();
+    scene.classList.remove('is-visible', 'is-rain');
+    delete scene.dataset.kind;
+    playSafe(journey);
+    state.currentVideo = 'journey';
+    notify('Rain off.');
+  }
+  syncRunAudio();
+}
+function makeStop() {
+  if (state.isStopping) return;
+  if (state.isRainMode) {
+    notify('Please turn off rain mode to make a stop.');
+    return;
+  }
+  state.isStopping = true;
+  syncRunAudio();
+  els.stop.disabled = true;
+  els.stop.classList.add('is-stopping');
+  const label = els.stop.querySelector('small');
+  if (label) label.textContent = 'Stopping…';
+  effect(journeyConfig.sounds.busBell);
+  journey.pause();
+  swapScene('stop', false);
+  notify('Stopping at the next stop…');
+}
+
+let currentStartupSound = null;
+
+function startJourney() {
+  if (state.isJourneyStarted) return;
+  state.isJourneyStarted = true;
+  els.start.disabled = true;
+  els.intro.classList.add('is-starting');
+  if (ytPlayer && ytReady && ytPlayer.playVideo) {
+    try {
+      ytPlayer.mute();
+      ytPlayer.playVideo();
+      setTimeout(() => {
+        if (!state.isJourneyStarted || els.player.hidden) {
+          ytPlayer.pauseVideo();
+          ytPlayer.unMute();
+          if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+          ytPlayer.seekTo(0, true);
+        }
+      }, 80);
+    } catch (e) {}
+  }
+  const startupSound = effect(journeyConfig.sounds.journeyStart);
+  startupSound.volume = 1;
+  currentStartupSound = startupSound;
+
+  const STARTUP_DURATION_MS = 8450;
+  let hasFinished = false;
+
+  const finishLoading = () => {
+    if (hasFinished) return;
+    hasFinished = true;
+    clearTimeout(state.startTimer);
+    try {
+      startupSound.pause();
+      startupSound.currentTime = 0;
+    } catch (e) {}
+    currentStartupSound = null;
+    journey.classList.add('is-visible');
+    playSafe(journey);
+    els.intro.classList.remove('is-starting');
+    els.intro.classList.add('is-unblurring');
+    app.classList.remove('intro-active');
+    els.player.hidden = false;
+    els.replay.hidden = false;
+    setTrack(0, true);
+    syncRunAudio();
+    syncRainAudio();
+    els.player.classList.remove('ui-blur-in');
+    els.replay.classList.remove('ui-blur-in');
+    els.brand.classList.remove('ui-blur-in');
+    void els.player.offsetWidth;
+    els.player.classList.add('ui-blur-in');
+    els.replay.classList.add('ui-blur-in');
+    els.brand.classList.add('ui-blur-in');
+    state.unblurTimer = setTimeout(() => {
+      els.intro.classList.remove('is-unblurring');
+      els.intro.classList.add('is-hidden');
+    }, 1000);
+  };
+  state.startTimer = setTimeout(finishLoading, STARTUP_DURATION_MS);
+}
+
+function resetJourney() {
+  clearTimeout(state.startTimer);
+  clearTimeout(state.unblurTimer);
+  clearTimeout(hornTimer);
+  clearTimeout(bellTimer);
+  if (currentStartupSound) {
+    try {
+      currentStartupSound.pause();
+      currentStartupSound.currentTime = 0;
+    } catch (e) {}
+    currentStartupSound = null;
+  }
+  els.horn.classList.remove('is-pressed');
+  els.bell.classList.remove('is-pressed');
+  rainAudio.pause();
+  rainAudio.currentTime = 0;
+  runAudio.pause();
+  runAudio.currentTime = 0;
+  pauseMusic();
+  if (ytPlayer && ytReady && ytPlayer.seekTo) {
+    ytPlayer.seekTo(0, true);
+  }
+  scene.pause();
+  scene.removeAttribute('src');
+  scene.load();
+  scene.classList.remove('is-visible', 'is-rain');
+  delete scene.dataset.kind;
+  journey.pause();
+  journey.currentTime = 0;
+  journey.classList.remove('is-visible');
+  Object.assign(state, {
+    isJourneyStarted: false,
+    isRainMode: false,
+    isStopping: false,
+    currentVideo: 'journey',
+    currentSongIndex: 0,
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0
+  });
+  els.player.hidden = true;
+  els.replay.hidden = true;
+  els.player.classList.remove('ui-blur-in');
+  els.replay.classList.remove('ui-blur-in');
+  els.brand.classList.remove('ui-blur-in');
+  els.stop.disabled = false;
+  els.stop.classList.remove('is-stopping');
+  const stopLabel = els.stop.querySelector('small');
+  if (stopLabel) stopLabel.textContent = 'Make a Stop';
+  els.rain.classList.remove('active');
+  els.rain.querySelector('small').textContent = 'Rain Off';
+  els.rain.setAttribute('aria-label', 'Turn rain on');
+  els.progress.value = 0;
+  els.progress.style.setProperty('--progress', '0%');
+  els.current.textContent = '0:00';
+  els.duration.textContent = '0:00';
+  shuffle(playlist);
+  els.title.textContent = playlist[0].title;
+  els.artist.textContent = playlist[0].artist;
+  els.album.src = playlist[0].albumArt;
+  els.intro.classList.remove('is-hidden', 'is-starting', 'is-unblurring');
+  app.classList.add('intro-active');
+  els.start.disabled = false;
+}
+
+// Track seek & progress polling from YouTube player
+setInterval(() => {
+  if (!ytPlayer || !ytReady || !state.isPlaying || !ytPlayer.getCurrentTime) return;
+  try {
+    const cur = ytPlayer.getCurrentTime() || 0;
+    const dur = ytPlayer.getDuration() || 0;
+    state.currentTime = cur;
+    if (dur > 0) {
+      state.duration = dur;
+      els.duration.textContent = formatTime(dur);
+      const pct = (cur / dur) * 100;
+      els.progress.value = pct;
+      els.progress.style.setProperty('--progress', `${pct}%`);
+    }
+    els.current.textContent = formatTime(cur);
+  } catch (e) {}
+}, 250);
+
+els.progress.addEventListener('input', () => {
+  if (!ytPlayer || !ytReady || !ytPlayer.getDuration) return;
+  try {
+    const dur = ytPlayer.getDuration();
+    if (dur > 0) {
+      const target = (els.progress.value / 100) * dur;
+      ytPlayer.seekTo(target, true);
+      els.current.textContent = formatTime(target);
+      els.progress.style.setProperty('--progress', `${els.progress.value}%`);
+    }
+  } catch (e) {}
+});
+
+let hornTimer = null;
+let bellTimer = null;
+
+function triggerHorn() {
+  effect(journeyConfig.sounds.horn);
+  els.horn.classList.add('is-pressed');
+  clearTimeout(hornTimer);
+  hornTimer = setTimeout(() => els.horn.classList.remove('is-pressed'), 1400);
+}
+
+function triggerBell() {
+  effect(journeyConfig.sounds.busBell);
+  els.bell.classList.add('is-pressed');
+  clearTimeout(bellTimer);
+  bellTimer = setTimeout(() => els.bell.classList.remove('is-pressed'), 1200);
+}
+
+els.start.addEventListener('click', startJourney);
+els.replay.addEventListener('click', resetJourney);
+els.play.addEventListener('click', () => state.isPlaying ? pauseMusic() : playMusic());
+els.previous.addEventListener('click', () => setTrack(state.currentSongIndex - 1, true));
+els.next.addEventListener('click', () => setTrack(state.currentSongIndex + 1, true));
+els.horn.addEventListener('click', triggerHorn);
+els.bell.addEventListener('click', triggerBell);
+els.rain.addEventListener('click', toggleRain);
+els.stop.addEventListener('click', makeStop);
+
+scene.addEventListener('ended', () => {
+  if (state.isStopping) {
+    state.isStopping = false;
+    els.stop.disabled = false;
+    els.stop.classList.remove('is-stopping');
+    const stopLabel = els.stop.querySelector('small');
+    if (stopLabel) stopLabel.textContent = 'Make a Stop';
+    returnJourney();
+    syncRunAudio();
+    notify('Journey resumed.');
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.matches('input')) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    state.isPlaying ? pauseMusic() : playMusic();
+  }
+  if (e.key === 'ArrowRight') setTrack(state.currentSongIndex + 1, true);
+  if (e.key === 'ArrowLeft') setTrack(state.currentSongIndex - 1, true);
+});
