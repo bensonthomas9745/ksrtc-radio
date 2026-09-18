@@ -610,13 +610,26 @@ function startJourney() {
   let animId = null;
   const startTime = performance.now();
 
-  // Start the song exactly 2 seconds before loading finishes (at 6000ms out of 8000ms)
-  const MUSIC_START_DELAY_MS = Math.max(0, STARTUP_DURATION_MS - 2000); // 6000ms
+  // Start the song precisely when the loading sound reaches 6s
+  const onStartupTimeUpdate = () => {
+    if (startupSound.currentTime >= 6) {
+      startupSound.removeEventListener('timeupdate', onStartupTimeUpdate);
+      clearTimeout(state.songStartTimer);
+      if (!hasFinished && state.isJourneyStarted) {
+        triggerRideMusicStart();
+      }
+    }
+  };
+  startupSound.addEventListener('timeupdate', onStartupTimeUpdate);
+
+  // Fallback timer: ensure the song starts at 6s even if audio element timeupdate lags
+  clearTimeout(state.songStartTimer);
   state.songStartTimer = setTimeout(() => {
+    startupSound.removeEventListener('timeupdate', onStartupTimeUpdate);
     if (!hasFinished && state.isJourneyStarted) {
       triggerRideMusicStart();
     }
-  }, MUSIC_START_DELAY_MS);
+  }, 6000);
 
   function animateProgress(now) {
     if (hasFinished) {
