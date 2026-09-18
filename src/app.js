@@ -12,7 +12,8 @@ function shuffle(array) {
 shuffle(playlist);
 
 const $ = (id) => document.getElementById(id);
-const state = { isJourneyStarted:false, isRainMode:false, isStopping:false, currentVideo:'journey', currentSongIndex:0, isPlaying:false, currentTime:0, duration:0, startTimer:null, unblurTimer:null };
+const state = { isJourneyStarted:false, isRainMode:false, isStopping:false, currentVideo:'journey', currentSongIndex:0, isPlaying:false, currentTime:0, duration:0, startTimer:null, unblurTimer:null, songStartTimer:null };
+let hasStartedMusic = false;
 const app = $('app');
 const journey = $('journey-video'), rainVideo = $('rain-video'), stopVideo = $('stop-video'), scene = $('scene-video');
 const loadingBar = $('loading-bar'), loadingStatus = $('loading-status');
@@ -220,7 +221,7 @@ function initYTPlayer() {
       width: '200',
       videoId: playlist[state.currentSongIndex].id,
       playerVars: {
-        autoplay: 1,
+        autoplay: 0,
         controls: 0,
         disablekb: 1,
         fs: 0,
@@ -235,20 +236,20 @@ function initYTPlayer() {
           try {
             if (ytPlayer.unMute) ytPlayer.unMute();
             if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
-            // Automatically play video immediately when ready
-            if (ytPlayer.playVideo) {
-              ytPlayer.playVideo();
-            } else if (ytPlayer.loadVideoById) {
-              ytPlayer.loadVideoById(playlist[state.currentSongIndex].id);
+            if (state.isJourneyStarted && (hasStartedMusic || hasFinished)) {
+              triggerRideMusicStart();
+            } else if (ytPlayer.cueVideoById) {
+              ytPlayer.cueVideoById(playlist[state.currentSongIndex].id);
             }
-            state.isPlaying = true;
-            els.play.classList.add('is-playing');
-            els.play.setAttribute('aria-label', 'Pause');
           } catch (e) {
-            console.warn('Initial play attempt error:', e);
+            console.warn('Initial setup attempt error:', e);
           }
           if (pendingTrack !== null) {
-            setTrack(pendingTrack.index, pendingTrack.shouldPlay !== false);
+            if (state.isJourneyStarted && (hasStartedMusic || hasFinished)) {
+              setTrack(pendingTrack.index, pendingTrack.shouldPlay !== false);
+            } else if (ytPlayer.cueVideoById) {
+              ytPlayer.cueVideoById(playlist[pendingTrack.index].id);
+            }
             pendingTrack = null;
           }
         },
@@ -550,14 +551,9 @@ function makeStop() {
 
 let currentStartupSound = null;
 
-function startJourney() {
-  if (state.isJourneyStarted) return;
-  state.isJourneyStarted = true;
-  hasFinished = false;
-  els.start.disabled = true;
-  els.intro.classList.add('is-starting');
-
-  // Trigger song playback synchronously on user gesture so mobile browsers authorize audio
+function triggerRideMusicStart() {
+  if (hasStartedMusic || !state.isJourneyStarted) return;
+  hasStartedMusic = true;
   state.isPlaying = true;
   els.play.classList.add('is-playing');
   els.play.setAttribute('aria-label', 'Pause');
@@ -565,16 +561,45 @@ function startJourney() {
     try {
       if (ytPlayer.unMute) ytPlayer.unMute();
       if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
-      if (ytPlayer.playVideo) {
-        ytPlayer.playVideo();
-      } else if (ytPlayer.loadVideoById) {
-        ytPlayer.loadVideoById(playlist[state.currentSongIndex].id);
+      const pState = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+      if (pState !== YT.PlayerState.PLAYING && pState !== YT.PlayerState.BUFFERING) {
+        if (ytPlayer.playVideo) {
+          ytPlayer.playVideo();
+        } else if (ytPlayer.loadVideoById) {
+          ytPlayer.loadVideoById(playlist[state.currentSongIndex].id);
+        }
       }
     } catch (e) {
       playMusic();
     }
   } else {
     pendingTrack = { index: state.currentSongIndex, shouldPlay: true };
+  }
+  syncRunAudio();
+  syncRainAudio();
+  updatePlaylistActiveState();
+}
+
+function startJourney() {
+  if (state.isJourneyStarted) return;
+  state.isJourneyStarted = true;
+  hasFinished = false;
+  hasStartedMusic = false;
+  clearTimeout(state.songStartTimer);
+  els.start.disabled = true;
+  els.intro.classList.add('is-starting');
+
+  // Prime YouTube audio permission on user gesture (cue track without playing)
+  if (ytPlayer && ytReady) {
+    try {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+      if (ytPlayer.cueVideoById) {
+        ytPlayer.cueVideoById(playlist[state.currentSongIndex].id);
+      }
+    } catch (e) {}
+  } else {
+    pendingTrack = { index: state.currentSongIndex, shouldPlay: false };
   }
 
   const startupSound = effect(journeyConfig.sounds.journeyStart);
@@ -584,6 +609,14 @@ function startJourney() {
   const STARTUP_DURATION_MS = 8000;
   let animId = null;
   const startTime = performance.now();
+
+  // Start the song exactly 2 seconds before loading finishes (at 6000ms out of 8000ms)
+  const MUSIC_START_DELAY_MS = Math.max(0, STARTUP_DURATION_MS - 2000); // 6000ms
+  state.songStartTimer = setTimeout(() => {
+    if (!hasFinished && state.isJourneyStarted) {
+      triggerRideMusicStart();
+    }
+  }, MUSIC_START_DELAY_MS);
 
   function animateProgress(now) {
     if (hasFinished) {
@@ -672,26 +705,9 @@ const finishLoading = () => {
   els.replay.hidden = false;
   updateRainBarState(state.isRainMode);
 
-  // Automatically ensure music playback is active when the ride reveals
-  state.isPlaying = true;
-  els.play.classList.add('is-playing');
-  els.play.setAttribute('aria-label', 'Pause');
-  if (ytPlayer && ytReady) {
-    try {
-      const pState = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
-      if (pState !== YT.PlayerState.PLAYING && pState !== YT.PlayerState.BUFFERING) {
-        if (ytPlayer.playVideo) {
-          ytPlayer.playVideo();
-        }
-      }
-    } catch (e) {
-      playMusic();
-    }
-  } else {
-    pendingTrack = { index: state.currentSongIndex, shouldPlay: true };
-  }
-  syncRunAudio();
-  syncRainAudio();
+  // Ensure music playback is triggered if not already started
+  clearTimeout(state.songStartTimer);
+  triggerRideMusicStart();
 
   // When opened in Instagram browser only: pop in guidance message in song screen
   if (isInstagramOrInApp && !hasShownInstaModal) {
@@ -728,6 +744,8 @@ function resetJourney() {
   hideInstaModal();
   clearTimeout(state.startTimer);
   clearTimeout(state.unblurTimer);
+  clearTimeout(state.songStartTimer);
+  hasStartedMusic = false;
   clearTimeout(hornTimer);
   clearTimeout(bellTimer);
   clearTimeout(stopFallbackTimer);
@@ -944,7 +962,7 @@ const unlockAudioOnFirstTouch = () => {
   window.removeEventListener('pointerdown', unlockAudioOnFirstTouch);
   window.removeEventListener('touchstart', unlockAudioOnFirstTouch);
   window.removeEventListener('click', unlockAudioOnFirstTouch);
-  if (!state.isPlaying && ytPlayer && ytReady) {
+  if (state.isJourneyStarted && (hasStartedMusic || hasFinished) && !state.isPlaying && ytPlayer && ytReady) {
     playMusic();
   }
 };
