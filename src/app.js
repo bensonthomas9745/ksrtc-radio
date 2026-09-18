@@ -1,4 +1,4 @@
-import { journeyConfig, playlist } from './config.js';
+import { journeyConfig, playlist } from './config.js?v=2';
 
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {

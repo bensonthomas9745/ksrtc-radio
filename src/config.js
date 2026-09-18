@@ -13,7 +13,7 @@ export const journeyConfig = {
     journeyStart: './assets/audio/startsound.m4a',
     horn: './assets/audio/hornsound.mp3',
     busBell: './assets/audio/busbell.mp3',
-    rain: './assets/audio/rainsound.mp3',
+    rain: './assets/audio/rainsound.mp3?v=2',
     run: './assets/audio/runsound.mp3'
   },
   volumes: { music: 0.82, effects: 0.9, rain: 1.0, run: 0.3 },
