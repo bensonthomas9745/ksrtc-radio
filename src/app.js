@@ -182,38 +182,29 @@ function initJourneyVideo() {
     .catch(() => {});
 }
 
+function initSecondaryVideos() {
+  if (!rainVideo.src || rainVideo.src === window.location.href) {
+    rainVideo.src = journeyConfig.videos.rain;
+  }
+  rainVideo.loop = true;
+  rainVideo.preload = 'auto';
+  rainVideo.load();
+
+  if (!stopVideo.src || stopVideo.src === window.location.href) {
+    stopVideo.src = journeyConfig.videos.stop;
+  }
+  stopVideo.loop = false;
+  stopVideo.preload = 'auto';
+  stopVideo.load();
+}
+
 // Load primary journey video once into RAM for buffer-free looping
 initJourneyVideo();
+// Immediately initialize secondary videos so make-stop and rain are instantly responsive
+initSecondaryVideos();
 
 function preloadSecondaryVideos() {
-  setTimeout(async () => {
-    try {
-      const rRes = await fetch(journeyConfig.videos.rain);
-      if (rRes.ok) {
-        rainVideo.src = URL.createObjectURL(await rRes.blob());
-      } else {
-        rainVideo.src = journeyConfig.videos.rain;
-      }
-    } catch (e) {
-      rainVideo.src = journeyConfig.videos.rain;
-    }
-    rainVideo.loop = true;
-    rainVideo.preload = 'auto';
-    rainVideo.load();
-
-    try {
-      const sRes = await fetch(journeyConfig.videos.stop);
-      if (sRes.ok) {
-        stopVideo.src = URL.createObjectURL(await sRes.blob());
-      } else {
-        stopVideo.src = journeyConfig.videos.stop;
-      }
-    } catch (e) {
-      stopVideo.src = journeyConfig.videos.stop;
-    }
-    stopVideo.preload = 'auto';
-    stopVideo.load();
-  }, 2000);
+  // Maintained for backward compatibility; videos are already initialized upfront
 }
 
 let ytPlayer = null;
@@ -501,8 +492,10 @@ function toggleRain() {
   syncRunAudio();
 }
 
+let stopFallbackTimer = null;
+
 function makeStop() {
-  if (state.isStopping) return;
+  if (state.isStopping || !state.isJourneyStarted) return;
   if (state.isRainMode) {
     notify('Please turn off rain mode to make a stop.');
     return;
@@ -514,13 +507,42 @@ function makeStop() {
   const label = els.stop.querySelector('small');
   if (label) label.textContent = 'Stopping…';
   effect(journeyConfig.sounds.busBell);
+
+  if (!stopVideo.src || stopVideo.src === window.location.href) {
+    stopVideo.src = journeyConfig.videos.stop;
+  }
+
+  try {
+    stopVideo.currentTime = 0;
+  } catch (e) {}
+
   journey.pause();
   journey.classList.remove('is-visible');
-  stopVideo.currentTime = 0;
   stopVideo.classList.add('is-visible');
-  playSafe(stopVideo);
+
+  const playPromise = playSafe(stopVideo);
+  if (playPromise && typeof playPromise.catch === 'function') {
+    playPromise.catch(() => {
+      clearTimeout(stopFallbackTimer);
+      stopFallbackTimer = setTimeout(onStopEnded, 1800);
+    });
+  }
+
   state.currentVideo = 'stop';
   notify('Stopping at the next stop…');
+
+  // Watchdog timer: guarantees journey resumes even if device freezes, stalls, or drops video playback
+  clearTimeout(stopFallbackTimer);
+  const dur = (Number.isFinite(stopVideo.duration) && stopVideo.duration > 0)
+    ? stopVideo.duration
+    : 7.5;
+  const timeoutMs = Math.ceil(dur * 1000) + 1200;
+
+  stopFallbackTimer = setTimeout(() => {
+    if (state.isStopping) {
+      onStopEnded();
+    }
+  }, timeoutMs);
 }
 
 let currentStartupSound = null;
@@ -705,6 +727,7 @@ function resetJourney() {
   clearTimeout(state.unblurTimer);
   clearTimeout(hornTimer);
   clearTimeout(bellTimer);
+  clearTimeout(stopFallbackTimer);
   if (currentStartupSound) {
     try {
       currentStartupSound.pause();
@@ -877,13 +900,16 @@ if (els.rainSoundToggle) {
 }
 
 function onStopEnded() {
+  clearTimeout(stopFallbackTimer);
   if (state.isStopping) {
     state.isStopping = false;
     els.stop.disabled = false;
     els.stop.classList.remove('is-stopping');
     const stopLabel = els.stop.querySelector('small');
     if (stopLabel) stopLabel.textContent = 'Make a Stop';
-    stopVideo.pause();
+    try {
+      stopVideo.pause();
+    } catch (e) {}
     stopVideo.classList.remove('is-visible');
     journey.classList.add('is-visible');
     playSafe(journey);
@@ -893,6 +919,9 @@ function onStopEnded() {
   }
 }
 stopVideo.addEventListener('ended', onStopEnded);
+stopVideo.addEventListener('error', () => {
+  if (state.isStopping) onStopEnded();
+});
 scene.addEventListener('ended', onStopEnded);
 
 document.addEventListener('keydown', (e) => {
