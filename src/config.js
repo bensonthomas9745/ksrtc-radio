@@ -10,7 +10,7 @@ export const journeyConfig = {
     fallbackImage: './assets/images/ksrtc-journey-fallback.png'
   },
   sounds: {
-    journeyStart: './assets/audio/startsound.mp3',
+    journeyStart: './assets/audio/startsound.m4a',
     horn: './assets/audio/hornsound.mp3',
     busBell: './assets/audio/busbell.mp3',
     rain: './assets/audio/rainsound.mp3',

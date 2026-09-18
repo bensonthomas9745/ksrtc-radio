@@ -37,7 +37,8 @@ button { color:inherit; cursor:pointer; }
 
 /* Enhanced High-Contrast KSRTC Journey Loading Screen */
 .journey-loading { display:none; justify-items:center; text-align:center; position:relative; z-index:10; width:min(440px,92vw); margin:0 auto; }
-.intro.is-starting .journey-loading, .intro.is-unblurring .journey-loading { display:grid; animation:loading-appear .5s cubic-bezier(.2,.8,.2,1) both; }
+.intro.is-starting .journey-loading { display:grid; animation:loading-appear .5s cubic-bezier(.2,.8,.2,1) both; }
+.intro.is-unblurring .journey-loading { display:grid; opacity:1; }
 @keyframes loading-appear{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
 
 /* Kerala Horizon */
@@ -92,7 +93,7 @@ button { color:inherit; cursor:pointer; }
 .journey-loading .eyebrow { letter-spacing:.24em; font-size:10.5px; font-weight:700; color:#f5c871; margin:0; text-transform:uppercase; text-shadow:0 0 12px rgba(245,200,113,.6); }
 .journey-loading h2 { margin:10px 0 18px; font:600 clamp(27px,3.4vw,38px)/1.1 'Playfair Display',serif; color:#fff2dd; letter-spacing:.02em; text-shadow:0 3px 20px rgba(0,0,0,.9),0 0 10px rgba(255,230,180,.2); }
 .loading-track { width:min(320px,82vw); height:6px; background:rgba(15,18,14,.85); border:1.5px solid rgba(240,195,100,.5); overflow:hidden; border-radius:99px; box-shadow:inset 0 2px 4px rgba(0,0,0,.9),0 0 16px rgba(225,175,75,.3); position:relative; }
-.loading-track span { display:block; width:var(--loading-progress, 0%); height:100%; border-radius:99px; background:linear-gradient(90deg,#c48c2c 0%,#ffd768 75%,#ffffff 100%); box-shadow:0 0 20px 3px rgba(255,215,105,.95),0 0 6px #ffffff; transition:width .35s ease-out; }
+.loading-track span { display:block; width:var(--loading-progress, 0%); height:100%; border-radius:99px; background:linear-gradient(90deg,#c48c2c 0%,#ffd768 75%,#ffffff 100%); box-shadow:0 0 20px 3px rgba(255,215,105,.95),0 0 6px #ffffff; will-change:width; }
 @keyframes journey-load { 0%{width:0%} 100%{width:100%} }
 .loading-note { margin:14px 0 0; color:rgba(255,240,215,.85); font-size:12.5px; letter-spacing:.08em; text-shadow:0 1px 6px rgba(0,0,0,.8); }
 .player { position:absolute; left:50%; bottom:clamp(20px,5vh,63px); transform:translateX(-50%); width:min(520px,calc(100vw - 30px)); }

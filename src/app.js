@@ -25,16 +25,16 @@ els.album.src = playlist[0].albumArt;
 
 const rainAudio = new Audio(journeyConfig.sounds.rain);
 rainAudio.loop = true;
+rainAudio.preload = 'none';
 rainAudio.volume = journeyConfig.volumes.rain ?? 0.7;
 
 const runAudio = new Audio(journeyConfig.sounds.run);
 runAudio.loop = true;
+runAudio.preload = 'none';
 runAudio.volume = journeyConfig.volumes.run ?? 0.3;
 
 const preloadStatus = {
   journey: false,
-  rain: false,
-  stop: false,
   ytSong: false,
   minTimerPassed: false
 };
@@ -42,108 +42,97 @@ let isPreloadingYT = false;
 let ytSongBuffered = false;
 let hasFinished = false;
 
-function updateLoadingProgress() {
-  let percent = 0;
-  if (preloadStatus.journey) percent += 25;
-  if (preloadStatus.rain) percent += 20;
-  if (preloadStatus.stop) percent += 20;
-  if (preloadStatus.ytSong) percent += 20;
-  if (preloadStatus.minTimerPassed) percent += 15;
-
-  const currentW = Math.min(percent, 100);
-  if (loadingBar) {
-    loadingBar.style.setProperty('--loading-progress', `${currentW}%`);
-    loadingBar.style.width = `${currentW}%`;
-  }
-
-  if (loadingStatus && els.intro.classList.contains('is-starting')) {
-    if (currentW >= 100) {
-      loadingStatus.textContent = 'All aboard! Welcome aboard KSRTC Radio…';
-    } else if (!preloadStatus.journey || !preloadStatus.rain || !preloadStatus.stop) {
-      loadingStatus.textContent = 'Buffering scenic road videos & windshield view…';
-    } else if (!preloadStatus.ytSong) {
-      loadingStatus.textContent = 'Tuning into KSRTC Malayalam Radio…';
-    } else {
-      loadingStatus.textContent = 'Starting the engine • Next stop: Nostalgia…';
-    }
-  }
-}
-
 function checkAllLoadedAndFinish() {
   if (!state.isJourneyStarted || hasFinished) return;
-  updateLoadingProgress();
-  const allMediaReady = preloadStatus.journey && preloadStatus.rain && preloadStatus.stop && preloadStatus.ytSong;
-  if (allMediaReady && preloadStatus.minTimerPassed) {
+  if (preloadStatus.journey && preloadStatus.ytSong && preloadStatus.minTimerPassed) {
     finishLoading();
   }
 }
 
-const blobUrls = {};
+let journeyBlobUrl = null;
 
-async function preloadVideoIntoMemory(videoEl, src, key, loop = false) {
-  if (!videoEl || !src) {
-    preloadStatus[key] = true;
-    updateLoadingProgress();
-    return;
-  }
+function initJourneyVideo() {
+  journey.preload = 'auto';
+  journey.loop = true;
 
-  videoEl.preload = 'auto';
-  if (loop) {
-    videoEl.loop = true;
-    videoEl.addEventListener('ended', () => {
-      videoEl.currentTime = 0;
-      playSafe(videoEl);
-    });
-  }
+  journey.addEventListener('ended', () => {
+    journey.currentTime = 0;
+    playSafe(journey);
+  });
 
-  const markReady = () => {
-    if (!preloadStatus[key]) {
-      preloadStatus[key] = true;
-      updateLoadingProgress();
-      checkAllLoadedAndFinish();
-    }
+  const onReady = () => {
+    preloadStatus.journey = true;
+    checkAllLoadedAndFinish();
   };
 
-  // 1. Set progressive source immediately
-  videoEl.src = src;
-  videoEl.load();
-
-  if (videoEl.readyState >= 3) {
-    markReady();
+  // 1. Immediately attach progressive source so first frame and chunks buffer right away
+  journey.src = journeyConfig.videos.journey;
+  if (journey.readyState >= 3) {
+    preloadStatus.journey = true;
   } else {
-    videoEl.addEventListener('canplay', markReady, { once: true });
-    videoEl.addEventListener('canplaythrough', markReady, { once: true });
-    videoEl.addEventListener('loadeddata', markReady, { once: true });
-    videoEl.addEventListener('error', () => {
-      console.warn(`Video ${key} stream warning: falling back`);
-      markReady();
-    }, { once: true });
+    journey.addEventListener('canplay', onReady, { once: true });
+    journey.addEventListener('loadeddata', onReady, { once: true });
+    journey.addEventListener('error', onReady, { once: true });
   }
+  journey.load();
 
-  // 2. Load entire video into in-memory Blob for completely buffer-free looping
-  try {
-    const res = await fetch(src);
-    if (res.ok) {
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      blobUrls[key] = blobUrl;
-      const wasPaused = videoEl.paused;
-      const curTime = videoEl.currentTime;
-      videoEl.src = blobUrl;
-      videoEl.load();
-      if (curTime > 0) videoEl.currentTime = curTime;
-      if (!wasPaused) playSafe(videoEl);
-      markReady();
-    }
-  } catch (err) {
-    console.info(`Streaming fallback active for ${key}`);
-  }
+  // 2. Concurrently fetch the entire video into RAM as a Blob for zero-buffer looping
+  fetch(journeyConfig.videos.journey)
+    .then(res => (res.ok ? res.blob() : null))
+    .then(blob => {
+      if (!blob) return;
+      journeyBlobUrl = URL.createObjectURL(blob);
+      if (!state.isJourneyStarted) {
+        journey.src = journeyBlobUrl;
+        journey.load();
+        preloadStatus.journey = true;
+      } else {
+        journey.addEventListener('ended', () => {
+          if (journey.src !== journeyBlobUrl) {
+            journey.src = journeyBlobUrl;
+            journey.load();
+            journey.currentTime = 0;
+            playSafe(journey);
+          }
+        }, { once: true });
+      }
+    })
+    .catch(() => {});
 }
 
-// Preload and cache all 3 videos into memory for instant playback & seamless looping
-preloadVideoIntoMemory(journey, journeyConfig.videos.journey, 'journey', true);
-preloadVideoIntoMemory(rainVideo, journeyConfig.videos.rain, 'rain', true);
-preloadVideoIntoMemory(stopVideo, journeyConfig.videos.stop, 'stop', false);
+// Load primary journey video once into RAM for buffer-free looping
+initJourneyVideo();
+
+function preloadSecondaryVideos() {
+  setTimeout(async () => {
+    try {
+      const rRes = await fetch(journeyConfig.videos.rain);
+      if (rRes.ok) {
+        rainVideo.src = URL.createObjectURL(await rRes.blob());
+      } else {
+        rainVideo.src = journeyConfig.videos.rain;
+      }
+    } catch (e) {
+      rainVideo.src = journeyConfig.videos.rain;
+    }
+    rainVideo.loop = true;
+    rainVideo.preload = 'auto';
+    rainVideo.load();
+
+    try {
+      const sRes = await fetch(journeyConfig.videos.stop);
+      if (sRes.ok) {
+        stopVideo.src = URL.createObjectURL(await sRes.blob());
+      } else {
+        stopVideo.src = journeyConfig.videos.stop;
+      }
+    } catch (e) {
+      stopVideo.src = journeyConfig.videos.stop;
+    }
+    stopVideo.preload = 'auto';
+    stopVideo.load();
+  }, 2000);
+}
 
 let ytPlayer = null;
 let ytReady = false;
@@ -194,7 +183,6 @@ function initYTPlayer() {
                 ytPlayer.unMute();
                 if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
               } catch (e) {}
-              updateLoadingProgress();
               checkAllLoadedAndFinish();
             }
             return;
@@ -220,7 +208,6 @@ function initYTPlayer() {
           console.warn('YouTube playback error, fallback to ready:', err);
           isPreloadingYT = false;
           preloadStatus.ytSong = true;
-          updateLoadingProgress();
           checkAllLoadedAndFinish();
         }
       }
@@ -228,7 +215,6 @@ function initYTPlayer() {
   } catch (err) {
     console.error('Error creating YouTube player:', err);
     preloadStatus.ytSong = true;
-    updateLoadingProgress();
   }
 }
 
@@ -242,9 +228,13 @@ function startYTPreload() {
       ytPlayer.playVideo();
     } catch (e) {
       preloadStatus.ytSong = true;
-      updateLoadingProgress();
       checkAllLoadedAndFinish();
     }
+  } else {
+    setTimeout(() => {
+      preloadStatus.ytSong = true;
+      checkAllLoadedAndFinish();
+    }, 2500);
   }
 }
 
@@ -422,51 +412,81 @@ function startJourney() {
   // Trigger YouTube first track pre-buffering
   startYTPreload();
 
-  // Safety fallback for YouTube: if slow or throttled, don't stall forever
+  // Safety fallback for YouTube: if slow or throttled, never stall
   setTimeout(() => {
     if (!preloadStatus.ytSong) {
       preloadStatus.ytSong = true;
-      updateLoadingProgress();
       checkAllLoadedAndFinish();
     }
-  }, 7000);
+  }, 4500);
 
   const startupSound = effect(journeyConfig.sounds.journeyStart);
   startupSound.volume = 1;
   currentStartupSound = startupSound;
 
   const STARTUP_DURATION_MS = 8000;
-  const progressInterval = setInterval(() => {
+  let animId = null;
+  const startTime = performance.now();
+
+  function animateProgress(now) {
     if (hasFinished) {
-      clearInterval(progressInterval);
+      if (loadingBar) {
+        loadingBar.style.width = '100%';
+        loadingBar.style.setProperty('--loading-progress', '100%');
+      }
       return;
     }
-    updateLoadingProgress();
-  }, 200);
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / STARTUP_DURATION_MS, 1);
+    // Smooth ease-out curve for continuous buttery flow
+    const eased = 1 - Math.pow(1 - progress, 1.8);
+    const visualPct = Math.min(eased * 100, 99.5);
 
-  startupSound.addEventListener('ended', () => {
-    clearInterval(progressInterval);
+    if (loadingBar) {
+      loadingBar.style.width = `${visualPct}%`;
+      loadingBar.style.setProperty('--loading-progress', `${visualPct}%`);
+    }
+
+    if (loadingStatus) {
+      if (visualPct < 28) {
+        loadingStatus.textContent = 'Starting KSRTC engine • Next stop: Nostalgia…';
+      } else if (visualPct < 60) {
+        loadingStatus.textContent = 'Tuning onboard radio • Boarding passengers…';
+      } else if (visualPct < 90) {
+        loadingStatus.textContent = 'Fast Passenger clearing depot…';
+      } else {
+        loadingStatus.textContent = 'All aboard! Welcome to KSRTC Radio…';
+      }
+    }
+
+    if (progress < 1 && !hasFinished) {
+      animId = requestAnimationFrame(animateProgress);
+    }
+  }
+
+  animId = requestAnimationFrame(animateProgress);
+
+  const onEngineComplete = () => {
+    cancelAnimationFrame(animId);
     preloadStatus.minTimerPassed = true;
     checkAllLoadedAndFinish();
-  }, { once: true });
+  };
 
-  state.startTimer = setTimeout(() => {
-    clearInterval(progressInterval);
-    preloadStatus.minTimerPassed = true;
-    checkAllLoadedAndFinish();
-  }, STARTUP_DURATION_MS);
+  startupSound.addEventListener('ended', onEngineComplete, { once: true });
+  startupSound.addEventListener('error', onEngineComplete, { once: true });
 
-  // Absolute safety timeout: never hang forever (max 20 seconds)
+  state.startTimer = setTimeout(onEngineComplete, STARTUP_DURATION_MS);
+
+  // Absolute safety timeout: never hang forever
   setTimeout(() => {
     if (!hasFinished) {
+      cancelAnimationFrame(animId);
       preloadStatus.journey = true;
-      preloadStatus.rain = true;
-      preloadStatus.stop = true;
       preloadStatus.ytSong = true;
       preloadStatus.minTimerPassed = true;
       finishLoading();
     }
-  }, 20000);
+  }, 9500);
 }
 
 const finishLoading = () => {
@@ -501,6 +521,9 @@ const finishLoading = () => {
   setTrack(0, true);
   syncRunAudio();
   syncRainAudio();
+
+  // Preload secondary scenes smoothly in background now that ride is active
+  preloadSecondaryVideos();
 
   els.player.classList.remove('ui-blur-in');
   els.replay.classList.remove('ui-blur-in');
@@ -585,6 +608,9 @@ function resetJourney() {
   if (loadingBar) {
     loadingBar.style.width = '0%';
     loadingBar.style.setProperty('--loading-progress', '0%');
+  }
+  if (loadingStatus) {
+    loadingStatus.textContent = 'Starting the engine • Next stop: Nostalgia…';
   }
 }
 
