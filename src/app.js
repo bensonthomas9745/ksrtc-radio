@@ -307,7 +307,7 @@ function playSafe(media, label) { return media.play().catch(()=> label && notify
 function effect(path) { const sound=new Audio(path); sound.volume=journeyConfig.volumes.effects; sound.play().catch(()=>notify('Sound effect is ready when its file is added.')); return sound; }
 
 function syncRunAudio() {
-  const shouldPlay = state.isJourneyStarted && !els.player.hidden && !state.isStopping;
+  const shouldPlay = state.isJourneyStarted && !els.player.hidden && !state.isStopping && state.isPlaying;
   if (shouldPlay && runAudio.volume > 0) {
     if (runAudio.paused) {
       playSafe(runAudio, 'Bus running sound');
@@ -426,6 +426,7 @@ function setTrack(index, shouldPlay = true) {
     console.error('Error updating track:', err);
   }
   updatePlaylistActiveState();
+  syncRunAudio();
 }
 
 function playMusic() {
@@ -448,6 +449,7 @@ function playMusic() {
   } else {
     setTrack(state.currentSongIndex, true);
   }
+  syncRunAudio();
 }
 
 function pauseMusic() {
@@ -460,6 +462,7 @@ function pauseMusic() {
       ytPlayer.pauseVideo();
     } catch (e) {}
   }
+  syncRunAudio();
 }
 function toggleRain() {
   if (state.isStopping) return;
@@ -859,7 +862,9 @@ if (els.boardNow) {
     }
   });
 }
-els.replay.addEventListener('click', resetJourney);
+els.replay.addEventListener('click', () => {
+  window.location.reload();
+});
 els.previous.addEventListener('click', () => setTrack(state.currentSongIndex - 1, true));
 els.play.addEventListener('click', () => {
   if (state.isPlaying) {
