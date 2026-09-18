@@ -26,7 +26,7 @@ els.album.src = playlist[0].albumArt;
 const rainAudio = new Audio(journeyConfig.sounds.rain);
 rainAudio.loop = true;
 rainAudio.preload = 'none';
-rainAudio.volume = journeyConfig.volumes.rain ?? 0.7;
+rainAudio.volume = journeyConfig.volumes.rain ?? 1.0;
 
 const runAudio = new Audio(journeyConfig.sounds.run);
 runAudio.loop = true;
@@ -361,7 +361,7 @@ function toggleRain() {
     rainVideo.classList.add('is-visible');
     playSafe(rainVideo);
     state.currentVideo = 'rain';
-    rainAudio.volume = journeyConfig.volumes.rain ?? 0.7;
+    rainAudio.volume = journeyConfig.volumes.rain ?? 1.0;
     rainAudio.currentTime = 0;
     syncRainAudio();
     notify('Rain on.');
