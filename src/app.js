@@ -78,14 +78,23 @@ function checkAllLoadedAndFinish() {
   }
 }
 
-function setupVideoPreload(videoEl, src, key) {
+const blobUrls = {};
+
+async function preloadVideoIntoMemory(videoEl, src, key, loop = false) {
   if (!videoEl || !src) {
     preloadStatus[key] = true;
     updateLoadingProgress();
     return;
   }
-  videoEl.src = src;
+
   videoEl.preload = 'auto';
+  if (loop) {
+    videoEl.loop = true;
+    videoEl.addEventListener('ended', () => {
+      videoEl.currentTime = 0;
+      playSafe(videoEl);
+    });
+  }
 
   const markReady = () => {
     if (!preloadStatus[key]) {
@@ -95,6 +104,10 @@ function setupVideoPreload(videoEl, src, key) {
     }
   };
 
+  // 1. Set progressive source immediately
+  videoEl.src = src;
+  videoEl.load();
+
   if (videoEl.readyState >= 3) {
     markReady();
   } else {
@@ -102,17 +115,35 @@ function setupVideoPreload(videoEl, src, key) {
     videoEl.addEventListener('canplaythrough', markReady, { once: true });
     videoEl.addEventListener('loadeddata', markReady, { once: true });
     videoEl.addEventListener('error', () => {
-      console.warn(`Video ${key} preload warning: using available fallback`);
+      console.warn(`Video ${key} stream warning: falling back`);
       markReady();
     }, { once: true });
   }
-  videoEl.load();
+
+  // 2. Load entire video into in-memory Blob for completely buffer-free looping
+  try {
+    const res = await fetch(src);
+    if (res.ok) {
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      blobUrls[key] = blobUrl;
+      const wasPaused = videoEl.paused;
+      const curTime = videoEl.currentTime;
+      videoEl.src = blobUrl;
+      videoEl.load();
+      if (curTime > 0) videoEl.currentTime = curTime;
+      if (!wasPaused) playSafe(videoEl);
+      markReady();
+    }
+  } catch (err) {
+    console.info(`Streaming fallback active for ${key}`);
+  }
 }
 
-// Preload all 3 videos immediately
-setupVideoPreload(journey, journeyConfig.videos.journey, 'journey');
-setupVideoPreload(rainVideo, journeyConfig.videos.rain, 'rain');
-setupVideoPreload(stopVideo, journeyConfig.videos.stop, 'stop');
+// Preload and cache all 3 videos into memory for instant playback & seamless looping
+preloadVideoIntoMemory(journey, journeyConfig.videos.journey, 'journey', true);
+preloadVideoIntoMemory(rainVideo, journeyConfig.videos.rain, 'rain', true);
+preloadVideoIntoMemory(stopVideo, journeyConfig.videos.stop, 'stop', false);
 
 let ytPlayer = null;
 let ytReady = false;
