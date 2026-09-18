@@ -1,4 +1,4 @@
-import { journeyConfig, playlist } from './config.js?v=2';
+import { journeyConfig, playlist } from './config.js?v=3';
 
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -16,35 +16,117 @@ const state = { isJourneyStarted:false, isRainMode:false, isStopping:false, curr
 const app = $('app');
 const journey = $('journey-video'), rainVideo = $('rain-video'), stopVideo = $('stop-video'), scene = $('scene-video');
 const loadingBar = $('loading-bar'), loadingStatus = $('loading-status');
-const els = { intro:$('intro'), player:$('player'), start:$('start-journey'), replay:$('replay'), album:$('album-art'), title:$('track-title'), artist:$('track-artist'), progress:$('progress'), current:$('current-time'), duration:$('duration'), play:$('play'), previous:$('previous'), next:$('next'), stop:$('make-stop'), rain:$('rain'), horn:$('horn'), bell:$('bell'), toast:$('toast'), brand:document.querySelector('.brand') };
+const els = { intro:$('intro'), player:$('player'), start:$('start-journey'), replay:$('replay'), fullscreenBtn:$('fullscreen-btn'), playlistToggle:$('playlist-toggle'), album:$('album-art'), title:$('track-title'), artist:$('track-artist'), progress:$('progress'), current:$('current-time'), duration:$('duration'), play:$('play'), previous:$('previous'), next:$('next'), stop:$('make-stop'), rain:$('rain'), horn:$('horn'), bell:$('bell'), toast:$('toast'), brand:document.querySelector('.brand'), boardNow:$('board-now-btn'), busSoundToggle:$('bus-sound-toggle'), busSoundSlider:$('bus-sound-slider'), busSoundValue:$('bus-sound-value'), busSoundLabel:$('bus-sound-label'), rainSoundBar:$('rain-sound-bar'), rainSoundToggle:$('rain-sound-toggle'), rainSoundSlider:$('rain-sound-slider'), rainSoundValue:$('rain-sound-value'), rainSoundLabel:$('rain-sound-label') };
+
+// In-app browser detection (Instagram, Facebook, etc.)
+const isInstagramOrInApp = /(Instagram|FBAN|FBAV|Snapchat|TikTok|Line|Threads)/i.test(navigator.userAgent || '') || window.location.search.includes('inapp');
+let hasShownInstaModal = false;
+
+function showInstaModal() {
+  const modal = $('insta-modal');
+  if (!modal) return;
+  modal.hidden = false;
+  hasShownInstaModal = true;
+}
+
+function hideInstaModal() {
+  const modal = $('insta-modal');
+  if (!modal) return;
+  modal.hidden = true;
+}
 
 // Initialize first track metadata in DOM
 els.title.textContent = playlist[0].title;
 els.artist.textContent = playlist[0].artist;
 els.album.src = playlist[0].albumArt;
 
+// Rain sound state & user volume preference (default: 80%)
+const savedRainVolume = (() => {
+  try { return localStorage.getItem('ksrtc_rain_sound_volume_v2'); } catch (e) { return null; }
+})();
+let currentRainVolume = savedRainVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRainVolume, 10))) : Math.round((journeyConfig.volumes.rain ?? 0.8) * 100);
+let lastNonZeroRainVolume = currentRainVolume > 0 ? currentRainVolume : 80;
+
 const rainAudio = new Audio(journeyConfig.sounds.rain);
 rainAudio.loop = true;
 rainAudio.preload = 'none';
-rainAudio.volume = journeyConfig.volumes.rain ?? 1.0;
+rainAudio.volume = currentRainVolume / 100;
+
+function updateRainSoundUI(volume) {
+  if (els.rainSoundSlider) {
+    els.rainSoundSlider.value = volume;
+    els.rainSoundSlider.style.setProperty('--rain-volume', `${volume}%`);
+  }
+  if (els.rainSoundValue) {
+    els.rainSoundValue.textContent = volume === 0 ? 'Off' : `${volume}%`;
+  }
+  if (els.rainSoundToggle) {
+    const isOff = volume === 0;
+    els.rainSoundToggle.classList.toggle('is-muted', isOff);
+    els.rainSoundToggle.setAttribute('aria-label', isOff ? 'Turn on rain sound' : 'Turn off rain sound');
+    if (els.rainSoundLabel) {
+      els.rainSoundLabel.textContent = 'Rain Sound';
+    }
+  }
+}
+
+function updateRainBarState(isRainActive) {
+  if (els.rainSoundBar) {
+    els.rainSoundBar.classList.toggle('is-disabled', !isRainActive);
+    els.rainSoundBar.setAttribute('aria-disabled', String(!isRainActive));
+  }
+  if (els.rainSoundToggle) {
+    els.rainSoundToggle.disabled = !isRainActive;
+  }
+  if (els.rainSoundSlider) {
+    els.rainSoundSlider.disabled = !isRainActive;
+  }
+}
+
+updateRainSoundUI(currentRainVolume);
+updateRainBarState(false);
+
+// Bus running sound state & user volume preference
+const savedRunVolume = (() => {
+  try { return localStorage.getItem('ksrtc_bus_sound_volume'); } catch (e) { return null; }
+})();
+let currentRunVolume = savedRunVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRunVolume, 10))) : Math.round((journeyConfig.volumes.run ?? 0.3) * 100);
+let lastNonZeroRunVolume = currentRunVolume > 0 ? currentRunVolume : 30;
 
 const runAudio = new Audio(journeyConfig.sounds.run);
 runAudio.loop = true;
 runAudio.preload = 'none';
-runAudio.volume = journeyConfig.volumes.run ?? 0.3;
+runAudio.volume = currentRunVolume / 100;
+
+function updateBusSoundUI(volume) {
+  if (els.busSoundSlider) {
+    els.busSoundSlider.value = volume;
+    els.busSoundSlider.style.setProperty('--bus-volume', `${volume}%`);
+  }
+  if (els.busSoundValue) {
+    els.busSoundValue.textContent = volume === 0 ? 'Off' : `${volume}%`;
+  }
+  if (els.busSoundToggle) {
+    const isOff = volume === 0;
+    els.busSoundToggle.classList.toggle('is-muted', isOff);
+    els.busSoundToggle.setAttribute('aria-label', isOff ? 'Turn on bus sound' : 'Turn off bus sound');
+    if (els.busSoundLabel) {
+      els.busSoundLabel.textContent = 'Bus Sound';
+    }
+  }
+}
+
+updateBusSoundUI(currentRunVolume);
 
 const preloadStatus = {
   journey: false,
-  ytSong: false,
   minTimerPassed: false
 };
-let isPreloadingYT = false;
-let ytSongBuffered = false;
 let hasFinished = false;
 
 function checkAllLoadedAndFinish() {
   if (!state.isJourneyStarted || hasFinished) return;
-  if (preloadStatus.journey && preloadStatus.ytSong && preloadStatus.minTimerPassed) {
+  if (preloadStatus.journey && preloadStatus.minTimerPassed) {
     finishLoading();
   }
 }
@@ -141,19 +223,20 @@ let pendingTrack = null;
 function initYTPlayer() {
   if (ytPlayer || !window.YT || !window.YT.Player) return;
   try {
+    const originParam = window.location.origin && window.location.origin !== 'null' ? window.location.origin : undefined;
     ytPlayer = new YT.Player('yt-player', {
       height: '200',
       width: '200',
-      videoId: playlist[0].id,
+      videoId: playlist[state.currentSongIndex].id,
       playerVars: {
-        autoplay: 0,
+        autoplay: 1,
         controls: 0,
         disablekb: 1,
         fs: 0,
         rel: 0,
         playsinline: 1,
         enablejsapi: 1,
-        origin: window.location.origin
+        ...(originParam ? { origin: originParam } : {})
       },
       events: {
         onReady: () => {
@@ -161,80 +244,51 @@ function initYTPlayer() {
           try {
             if (ytPlayer.unMute) ytPlayer.unMute();
             if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
-            ytPlayer.cueVideoById(playlist[0].id);
-          } catch (e) {}
-          if (isPreloadingYT && !preloadStatus.ytSong) {
-            startYTPreload();
+            // Automatically play video immediately when ready
+            if (ytPlayer.playVideo) {
+              ytPlayer.playVideo();
+            } else if (ytPlayer.loadVideoById) {
+              ytPlayer.loadVideoById(playlist[state.currentSongIndex].id);
+            }
+            state.isPlaying = true;
+            els.play.classList.add('is-playing');
+            els.play.setAttribute('aria-label', 'Pause');
+          } catch (e) {
+            console.warn('Initial play attempt error:', e);
           }
           if (pendingTrack !== null) {
-            setTrack(pendingTrack.index, pendingTrack.shouldPlay);
+            setTrack(pendingTrack.index, pendingTrack.shouldPlay !== false);
             pendingTrack = null;
           }
         },
         onStateChange: (event) => {
-          if (isPreloadingYT && (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING)) {
-            if (event.data === YT.PlayerState.PLAYING) {
-              isPreloadingYT = false;
-              ytSongBuffered = true;
-              preloadStatus.ytSong = true;
-              try {
-                ytPlayer.pauseVideo();
-                ytPlayer.seekTo(0, true);
-                ytPlayer.unMute();
-                if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
-              } catch (e) {}
-              checkAllLoadedAndFinish();
-            }
-            return;
-          }
-
           if (event.data === YT.PlayerState.PLAYING) {
             state.isPlaying = true;
             els.play.classList.add('is-playing');
             els.play.setAttribute('aria-label', 'Pause');
             syncRunAudio();
             syncRainAudio();
+            updatePlaylistActiveState();
           } else if (event.data === YT.PlayerState.PAUSED) {
             state.isPlaying = false;
             els.play.classList.remove('is-playing');
             els.play.setAttribute('aria-label', 'Play');
             syncRunAudio();
             syncRainAudio();
+            updatePlaylistActiveState();
           } else if (event.data === YT.PlayerState.ENDED) {
             setTrack(state.currentSongIndex + 1, true);
           }
         },
         onError: (err) => {
-          console.warn('YouTube playback error, fallback to ready:', err);
-          isPreloadingYT = false;
-          preloadStatus.ytSong = true;
-          checkAllLoadedAndFinish();
+          console.warn('YouTube playback error:', err);
+          // If a track encounters an embed restriction, seamlessly advance to the next song
+          setTrack(state.currentSongIndex + 1, true);
         }
       }
     });
   } catch (err) {
     console.error('Error creating YouTube player:', err);
-    preloadStatus.ytSong = true;
-  }
-}
-
-function startYTPreload() {
-  if (preloadStatus.ytSong) return;
-  isPreloadingYT = true;
-  if (ytPlayer && ytReady && ytPlayer.loadVideoById) {
-    try {
-      ytPlayer.mute();
-      ytPlayer.loadVideoById(playlist[0].id);
-      ytPlayer.playVideo();
-    } catch (e) {
-      preloadStatus.ytSong = true;
-      checkAllLoadedAndFinish();
-    }
-  } else {
-    setTimeout(() => {
-      preloadStatus.ytSong = true;
-      checkAllLoadedAndFinish();
-    }, 2500);
   }
 }
 
@@ -257,13 +311,13 @@ const ytInitInterval = setInterval(() => {
 setTimeout(() => clearInterval(ytInitInterval), 10000);
 
 function formatTime(seconds) { if (!Number.isFinite(seconds)) return '0:00'; return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2,'0')}`; }
-function notify(message) { els.toast.textContent=message; els.toast.classList.add('show'); clearTimeout(notify.timer); notify.timer=setTimeout(()=>els.toast.classList.remove('show'),2200); }
+function notify(message) { els.toast.textContent=message; els.toast.classList.add('show'); clearTimeout(notify.timer); notify.timer=setTimeout(()=>els.toast.classList.remove('show'),3200); }
 function playSafe(media, label) { return media.play().catch(()=> label && notify(`${label} is ready when its file is added.`)); }
 function effect(path) { const sound=new Audio(path); sound.volume=journeyConfig.volumes.effects; sound.play().catch(()=>notify('Sound effect is ready when its file is added.')); return sound; }
 
 function syncRunAudio() {
-  const shouldPlay = state.isJourneyStarted && !els.player.hidden && !state.isStopping && state.isPlaying;
-  if (shouldPlay) {
+  const shouldPlay = state.isJourneyStarted && !els.player.hidden && !state.isStopping;
+  if (shouldPlay && runAudio.volume > 0) {
     if (runAudio.paused) {
       playSafe(runAudio, 'Bus running sound');
     }
@@ -274,9 +328,36 @@ function syncRunAudio() {
   }
 }
 
+function setBusSoundVolume(volume, savePref = true) {
+  currentRunVolume = Math.max(0, Math.min(100, volume));
+  if (currentRunVolume > 0) {
+    lastNonZeroRunVolume = currentRunVolume;
+  }
+  runAudio.volume = currentRunVolume / 100;
+  updateBusSoundUI(currentRunVolume);
+  if (savePref) {
+    try {
+      localStorage.setItem('ksrtc_bus_sound_volume', currentRunVolume);
+    } catch (e) {}
+  }
+  syncRunAudio();
+}
+
+function toggleBusSound() {
+  if (currentRunVolume > 0) {
+    lastNonZeroRunVolume = currentRunVolume;
+    setBusSoundVolume(0);
+    notify('Bus running sound muted.');
+  } else {
+    const target = lastNonZeroRunVolume > 0 ? lastNonZeroRunVolume : 30;
+    setBusSoundVolume(target);
+    notify(`Bus running sound on (${target}%).`);
+  }
+}
+
 function syncRainAudio() {
-  const shouldPlay = state.isJourneyStarted && !els.player.hidden && state.isRainMode && state.isPlaying;
-  if (shouldPlay) {
+  const shouldPlay = state.isJourneyStarted && !els.player.hidden && state.isRainMode;
+  if (shouldPlay && rainAudio.volume > 0) {
     if (rainAudio.paused) {
       playSafe(rainAudio, 'Rain sound');
     }
@@ -287,19 +368,46 @@ function syncRainAudio() {
   }
 }
 
-function setTrack(index, shouldPlay=state.isPlaying) {
-  state.currentSongIndex=(index+playlist.length)%playlist.length;
-  const track=playlist[state.currentSongIndex];
-  els.title.textContent=track.title;
-  els.artist.textContent=track.artist;
-  els.album.src=track.albumArt;
-  els.album.onerror=()=>{els.album.src=journeyConfig.videos.fallbackImage;};
-  els.progress.value=0;
-  els.progress.style.setProperty('--progress','0%');
-  els.current.textContent='0:00';
-  els.duration.textContent='0:00';
+function setRainSoundVolume(volume, savePref = true) {
+  currentRainVolume = Math.max(0, Math.min(100, volume));
+  if (currentRainVolume > 0) {
+    lastNonZeroRainVolume = currentRainVolume;
+  }
+  rainAudio.volume = currentRainVolume / 100;
+  updateRainSoundUI(currentRainVolume);
+  if (savePref) {
+    try {
+      localStorage.setItem('ksrtc_rain_sound_volume_v2', currentRainVolume);
+    } catch (e) {}
+  }
+  syncRainAudio();
+}
 
-  if (!ytReady || !ytPlayer || !ytPlayer.loadVideoById) {
+function toggleRainSound() {
+  if (currentRainVolume > 0) {
+    lastNonZeroRainVolume = currentRainVolume;
+    setRainSoundVolume(0);
+    notify('Rain sound muted.');
+  } else {
+    const target = lastNonZeroRainVolume > 0 ? lastNonZeroRainVolume : 80;
+    setRainSoundVolume(target);
+    notify(`Rain sound on (${target}%).`);
+  }
+}
+
+function setTrack(index, shouldPlay = true) {
+  state.currentSongIndex = (index + playlist.length) % playlist.length;
+  const track = playlist[state.currentSongIndex];
+  els.title.textContent = track.title;
+  els.artist.textContent = track.artist;
+  els.album.src = track.albumArt;
+  els.album.onerror = () => { els.album.src = journeyConfig.videos.fallbackImage; };
+  els.progress.value = 0;
+  els.progress.style.setProperty('--progress', '0%');
+  els.current.textContent = '0:00';
+  els.duration.textContent = '0:00';
+
+  if (!ytReady || !ytPlayer) {
     pendingTrack = { index: state.currentSongIndex, shouldPlay };
     return;
   }
@@ -307,29 +415,42 @@ function setTrack(index, shouldPlay=state.isPlaying) {
     if (ytPlayer.unMute) ytPlayer.unMute();
     if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
     if (shouldPlay) {
-      ytPlayer.loadVideoById(track.id);
       state.isPlaying = true;
       els.play.classList.add('is-playing');
       els.play.setAttribute('aria-label', 'Pause');
+      if (ytPlayer.loadVideoById) {
+        ytPlayer.loadVideoById(track.id);
+      } else if (ytPlayer.playVideo) {
+        ytPlayer.playVideo();
+      }
     } else {
-      ytPlayer.cueVideoById(track.id);
+      if (ytPlayer.cueVideoById) {
+        ytPlayer.cueVideoById(track.id);
+      }
+      state.isPlaying = false;
+      els.play.classList.remove('is-playing');
+      els.play.setAttribute('aria-label', 'Play');
     }
   } catch (err) {
     console.error('Error updating track:', err);
   }
+  updatePlaylistActiveState();
 }
 
 function playMusic() {
-  state.isPlaying=true;
+  state.isPlaying = true;
   els.play.classList.add('is-playing');
-  els.play.setAttribute('aria-label','Pause');
-  syncRunAudio();
-  syncRainAudio();
-  if (ytPlayer && ytReady && ytPlayer.playVideo) {
+  els.play.setAttribute('aria-label', 'Pause');
+  updatePlaylistActiveState();
+  if (ytPlayer && ytReady) {
     try {
       if (ytPlayer.unMute) ytPlayer.unMute();
       if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
-      ytPlayer.playVideo();
+      if (ytPlayer.playVideo) {
+        ytPlayer.playVideo();
+      } else {
+        setTrack(state.currentSongIndex, true);
+      }
     } catch (e) {
       setTrack(state.currentSongIndex, true);
     }
@@ -339,13 +460,14 @@ function playMusic() {
 }
 
 function pauseMusic() {
-  state.isPlaying=false;
+  state.isPlaying = false;
   els.play.classList.remove('is-playing');
-  els.play.setAttribute('aria-label','Play');
-  syncRunAudio();
-  syncRainAudio();
+  els.play.setAttribute('aria-label', 'Play');
+  updatePlaylistActiveState();
   if (ytPlayer && ytReady && ytPlayer.pauseVideo) {
-    ytPlayer.pauseVideo();
+    try {
+      ytPlayer.pauseVideo();
+    } catch (e) {}
   }
 }
 function toggleRain() {
@@ -354,6 +476,7 @@ function toggleRain() {
   els.rain.classList.toggle('active', state.isRainMode);
   els.rain.querySelector('small').textContent = state.isRainMode ? 'Rain On' : 'Rain Off';
   els.rain.setAttribute('aria-label', state.isRainMode ? 'Turn rain off' : 'Turn rain on');
+  updateRainBarState(state.isRainMode);
   if (state.isRainMode) {
     journey.pause();
     journey.classList.remove('is-visible');
@@ -361,7 +484,7 @@ function toggleRain() {
     rainVideo.classList.add('is-visible');
     playSafe(rainVideo);
     state.currentVideo = 'rain';
-    rainAudio.volume = journeyConfig.volumes.rain ?? 1.0;
+    rainAudio.volume = currentRainVolume / 100;
     rainAudio.currentTime = 0;
     syncRainAudio();
     notify('Rain on.');
@@ -409,16 +532,25 @@ function startJourney() {
   els.start.disabled = true;
   els.intro.classList.add('is-starting');
 
-  // Trigger YouTube first track pre-buffering
-  startYTPreload();
-
-  // Safety fallback for YouTube: if slow or throttled, never stall
-  setTimeout(() => {
-    if (!preloadStatus.ytSong) {
-      preloadStatus.ytSong = true;
-      checkAllLoadedAndFinish();
+  // Trigger song playback synchronously on user gesture so mobile browsers authorize audio
+  state.isPlaying = true;
+  els.play.classList.add('is-playing');
+  els.play.setAttribute('aria-label', 'Pause');
+  if (ytPlayer && ytReady) {
+    try {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+      if (ytPlayer.playVideo) {
+        ytPlayer.playVideo();
+      } else if (ytPlayer.loadVideoById) {
+        ytPlayer.loadVideoById(playlist[state.currentSongIndex].id);
+      }
+    } catch (e) {
+      playMusic();
     }
-  }, 4500);
+  } else {
+    pendingTrack = { index: state.currentSongIndex, shouldPlay: true };
+  }
 
   const startupSound = effect(journeyConfig.sounds.journeyStart);
   startupSound.volume = 1;
@@ -438,7 +570,6 @@ function startJourney() {
     }
     const elapsed = now - startTime;
     const progress = Math.min(elapsed / STARTUP_DURATION_MS, 1);
-    // Smooth ease-out curve for continuous buttery flow
     const eased = 1 - Math.pow(1 - progress, 1.8);
     const visualPct = Math.min(eased * 100, 99.5);
 
@@ -448,14 +579,12 @@ function startJourney() {
     }
 
     if (loadingStatus) {
-      if (visualPct < 28) {
-        loadingStatus.textContent = 'Starting KSRTC engine • Next stop: Nostalgia…';
-      } else if (visualPct < 60) {
-        loadingStatus.textContent = 'Tuning onboard radio • Boarding passengers…';
-      } else if (visualPct < 90) {
-        loadingStatus.textContent = 'Fast Passenger clearing depot…';
+      const remainingMs = Math.max(0, STARTUP_DURATION_MS - elapsed);
+      const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
+      if (progress >= 1) {
+        loadingStatus.textContent = 'All aboard! Welcome aboard KSRTC Radio…';
       } else {
-        loadingStatus.textContent = 'All aboard! Welcome to KSRTC Radio…';
+        loadingStatus.textContent = `Starting your ride in ${remainingSec} second${remainingSec === 1 ? '' : 's'}…`;
       }
     }
 
@@ -482,7 +611,6 @@ function startJourney() {
     if (!hasFinished) {
       cancelAnimationFrame(animId);
       preloadStatus.journey = true;
-      preloadStatus.ytSong = true;
       preloadStatus.minTimerPassed = true;
       finishLoading();
     }
@@ -517,21 +645,53 @@ const finishLoading = () => {
   app.classList.remove('intro-active');
   els.player.hidden = false;
   els.replay.hidden = false;
+  updateRainBarState(state.isRainMode);
 
-  setTrack(0, true);
+  // Automatically ensure music playback is active when the ride reveals
+  state.isPlaying = true;
+  els.play.classList.add('is-playing');
+  els.play.setAttribute('aria-label', 'Pause');
+  if (ytPlayer && ytReady) {
+    try {
+      const pState = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+      if (pState !== YT.PlayerState.PLAYING && pState !== YT.PlayerState.BUFFERING) {
+        if (ytPlayer.playVideo) {
+          ytPlayer.playVideo();
+        }
+      }
+    } catch (e) {
+      playMusic();
+    }
+  } else {
+    pendingTrack = { index: state.currentSongIndex, shouldPlay: true };
+  }
   syncRunAudio();
   syncRainAudio();
+
+  // When opened in Instagram browser only: pop in guidance message in song screen
+  if (isInstagramOrInApp && !hasShownInstaModal) {
+    setTimeout(() => {
+      showInstaModal();
+    }, 600);
+  }
 
   // Preload secondary scenes smoothly in background now that ride is active
   preloadSecondaryVideos();
 
   els.player.classList.remove('ui-blur-in');
   els.replay.classList.remove('ui-blur-in');
+  if (els.fullscreenBtn) els.fullscreenBtn.classList.remove('ui-blur-in');
   els.brand.classList.remove('ui-blur-in');
+  if (els.playlistToggle) els.playlistToggle.classList.remove('ui-blur-in');
+  const topNav = $('top-nav-actions');
+  if (topNav) topNav.classList.remove('ui-blur-in');
   void els.player.offsetWidth;
   els.player.classList.add('ui-blur-in');
   els.replay.classList.add('ui-blur-in');
+  if (els.fullscreenBtn) els.fullscreenBtn.classList.add('ui-blur-in');
   els.brand.classList.add('ui-blur-in');
+  if (els.playlistToggle) els.playlistToggle.classList.add('ui-blur-in');
+  if (topNav) topNav.classList.add('ui-blur-in');
 
   state.unblurTimer = setTimeout(() => {
     els.intro.classList.remove('is-unblurring');
@@ -540,6 +700,7 @@ const finishLoading = () => {
 };
 
 function resetJourney() {
+  hideInstaModal();
   clearTimeout(state.startTimer);
   clearTimeout(state.unblurTimer);
   clearTimeout(hornTimer);
@@ -558,8 +719,10 @@ function resetJourney() {
   runAudio.pause();
   runAudio.currentTime = 0;
   pauseMusic();
-  if (ytPlayer && ytReady && ytPlayer.seekTo) {
-    ytPlayer.seekTo(0, true);
+  if (ytPlayer && ytReady && ytPlayer.cueVideoById) {
+    try {
+      ytPlayer.cueVideoById(playlist[0].id);
+    } catch (e) {}
   }
   stopVideo.pause();
   stopVideo.currentTime = 0;
@@ -582,6 +745,7 @@ function resetJourney() {
   });
   els.player.hidden = true;
   els.replay.hidden = true;
+  updateRainBarState(false);
   els.player.classList.remove('ui-blur-in');
   els.replay.classList.remove('ui-blur-in');
   els.brand.classList.remove('ui-blur-in');
@@ -610,7 +774,7 @@ function resetJourney() {
     loadingBar.style.setProperty('--loading-progress', '0%');
   }
   if (loadingStatus) {
-    loadingStatus.textContent = 'Starting the engine • Next stop: Nostalgia…';
+    loadingStatus.textContent = 'Starting your ride in 8 seconds…';
   }
 }
 
@@ -663,14 +827,54 @@ function triggerBell() {
 }
 
 els.start.addEventListener('click', startJourney);
+if (els.boardNow) {
+  els.boardNow.addEventListener('click', () => {
+    if (!hasFinished && state.isJourneyStarted) {
+      preloadStatus.journey = true;
+      preloadStatus.minTimerPassed = true;
+      finishLoading();
+    }
+  });
+}
 els.replay.addEventListener('click', resetJourney);
-els.play.addEventListener('click', () => state.isPlaying ? pauseMusic() : playMusic());
 els.previous.addEventListener('click', () => setTrack(state.currentSongIndex - 1, true));
+els.play.addEventListener('click', () => {
+  if (state.isPlaying) {
+    pauseMusic();
+  } else {
+    playMusic();
+    if (isInstagramOrInApp) {
+      setTimeout(() => {
+        if (!state.isPlaying) {
+          showInstaModal();
+        }
+      }, 700);
+    }
+  }
+});
 els.next.addEventListener('click', () => setTrack(state.currentSongIndex + 1, true));
 els.horn.addEventListener('click', triggerHorn);
 els.bell.addEventListener('click', triggerBell);
 els.rain.addEventListener('click', toggleRain);
 els.stop.addEventListener('click', makeStop);
+
+if (els.busSoundSlider) {
+  els.busSoundSlider.addEventListener('input', (e) => {
+    setBusSoundVolume(parseInt(e.target.value, 10));
+  });
+}
+if (els.busSoundToggle) {
+  els.busSoundToggle.addEventListener('click', toggleBusSound);
+}
+
+if (els.rainSoundSlider) {
+  els.rainSoundSlider.addEventListener('input', (e) => {
+    setRainSoundVolume(parseInt(e.target.value, 10));
+  });
+}
+if (els.rainSoundToggle) {
+  els.rainSoundToggle.addEventListener('click', toggleRainSound);
+}
 
 function onStopEnded() {
   if (state.isStopping) {
@@ -700,3 +904,319 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') setTrack(state.currentSongIndex + 1, true);
   if (e.key === 'ArrowLeft') setTrack(state.currentSongIndex - 1, true);
 });
+
+// Auto-unlock music on the very first user interaction if browser blocked autoplay on initial load
+const unlockAudioOnFirstTouch = () => {
+  window.removeEventListener('pointerdown', unlockAudioOnFirstTouch);
+  window.removeEventListener('touchstart', unlockAudioOnFirstTouch);
+  window.removeEventListener('click', unlockAudioOnFirstTouch);
+  if (!state.isPlaying && ytPlayer && ytReady) {
+    playMusic();
+  }
+};
+window.addEventListener('pointerdown', unlockAudioOnFirstTouch, { passive: true });
+window.addEventListener('touchstart', unlockAudioOnFirstTouch, { passive: true });
+window.addEventListener('click', unlockAudioOnFirstTouch, { passive: true });
+
+function openInExternalBrowser() {
+  const isAndroid = /Android/i.test(navigator.userAgent || '');
+  const isIOS = /(iPhone|iPad|iPod)/i.test(navigator.userAgent || '');
+  const rawUrl = window.location.href;
+  const cleanUrl = rawUrl.replace(/^https?:\/\//, '');
+  const scheme = window.location.protocol.replace(':', '');
+
+  if (isAndroid) {
+    // Android Intent triggers opening in the system's default browser (Chrome)
+    const intentUrl = `intent://${cleanUrl}#Intent;scheme=${scheme};action=android.intent.action.VIEW;end`;
+    window.location.href = intentUrl;
+    setTimeout(() => {
+      window.open(rawUrl, '_system');
+    }, 400);
+  } else if (isIOS) {
+    const chromeUrl = `googlechromes://${cleanUrl}`;
+    window.location.href = chromeUrl;
+    setTimeout(() => {
+      notify('Tap ⋮ at top right → Open in Safari');
+    }, 600);
+  } else {
+    window.open(rawUrl, '_blank');
+  }
+}
+
+const instaModalClose = $('insta-modal-close');
+const instaOpenBtn = $('insta-open-btn');
+const instaDismissBtn = $('insta-dismiss-btn');
+const instaModalBackdrop = $('insta-modal-backdrop');
+
+if (instaModalClose) instaModalClose.addEventListener('click', hideInstaModal);
+if (instaDismissBtn) instaDismissBtn.addEventListener('click', hideInstaModal);
+if (instaModalBackdrop) instaModalBackdrop.addEventListener('click', hideInstaModal);
+if (instaOpenBtn) {
+  instaOpenBtn.addEventListener('click', () => {
+    openInExternalBrowser();
+    hideInstaModal();
+  });
+}
+
+/* ==========================================================================
+   Apple-Style Playlist Drawer Logic
+   ========================================================================== */
+const playlistToggle = $('playlist-toggle');
+const playlistDrawerWrap = $('playlist-drawer-wrap');
+const playlistDrawer = $('playlist-drawer');
+const playlistBackdrop = $('playlist-backdrop');
+const playlistCloseBtn = $('playlist-close-btn');
+const playlistItemsScroll = $('playlist-items-scroll');
+const playlistSearch = $('playlist-search');
+const playlistSearchClear = $('playlist-search-clear');
+const playlistCountBadge = $('playlist-count-badge');
+const playlistSubtitle = $('playlist-subtitle');
+const drawerCurrentTitle = $('drawer-current-title');
+const drawerCurrentArtist = $('drawer-current-artist');
+const drawerJumpBtn = $('drawer-jump-btn');
+
+let drawerCloseTimer = null;
+let currentSearchFilter = '';
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function updatePlaylistActiveState() {
+  const currentTrack = playlist[state.currentSongIndex];
+  if (drawerCurrentTitle && currentTrack) {
+    drawerCurrentTitle.textContent = currentTrack.title;
+  }
+  if (drawerCurrentArtist && currentTrack) {
+    drawerCurrentArtist.textContent = currentTrack.artist;
+  }
+
+  if (!playlistItemsScroll) return;
+  const items = playlistItemsScroll.querySelectorAll('.playlist-item');
+  items.forEach(item => {
+    const idx = parseInt(item.dataset.index, 10);
+    const isCurrent = idx === state.currentSongIndex;
+    item.classList.toggle('is-current', isCurrent);
+    item.classList.toggle('is-playing', isCurrent && state.isPlaying);
+  });
+}
+
+function renderPlaylist(filter = '') {
+  if (!playlistItemsScroll) return;
+  currentSearchFilter = filter.trim().toLowerCase();
+
+  const filtered = playlist
+    .map((song, index) => ({ song, index }))
+    .filter(({ song }) => {
+      if (!currentSearchFilter) return true;
+      return song.title.toLowerCase().includes(currentSearchFilter) ||
+             song.artist.toLowerCase().includes(currentSearchFilter);
+    });
+
+  if (filtered.length === 0) {
+    playlistItemsScroll.innerHTML = `<div class="playlist-empty-state">No songs found matching "${escapeHtml(filter)}"</div>`;
+    return;
+  }
+
+  playlistItemsScroll.innerHTML = filtered.map(({ song, index }) => {
+    const isCurrent = index === state.currentSongIndex;
+    const isPlaying = isCurrent && state.isPlaying;
+    return `
+      <button type="button" class="playlist-item ${isCurrent ? 'is-current' : ''} ${isPlaying ? 'is-playing' : ''}" data-index="${index}" aria-label="Play ${escapeHtml(song.title)}">
+        <span class="item-index">${index + 1}</span>
+        <div class="item-thumb-wrap">
+          <img class="item-thumb" src="${song.albumArt}" alt="" loading="lazy" />
+          <div class="item-eq-bars" aria-hidden="true">
+            <i></i><i></i><i></i>
+          </div>
+        </div>
+        <div class="item-meta">
+          <div class="item-title">${escapeHtml(song.title)}</div>
+          <div class="item-artist">${escapeHtml(song.artist)}</div>
+        </div>
+      </button>
+    `;
+  }).join('');
+
+  updatePlaylistActiveState();
+}
+
+function scrollToCurrentSong() {
+  if (!playlistItemsScroll) return;
+  const currentEl = playlistItemsScroll.querySelector('.playlist-item.is-current');
+  if (currentEl) {
+    currentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function openPlaylistDrawer() {
+  if (!playlistDrawerWrap) return;
+  clearTimeout(drawerCloseTimer);
+  playlistDrawerWrap.hidden = false;
+  void playlistDrawerWrap.offsetWidth; // force browser layout recalculation
+  playlistDrawerWrap.classList.add('is-open');
+  if (playlistToggle) playlistToggle.setAttribute('aria-expanded', 'true');
+  updatePlaylistActiveState();
+
+  setTimeout(() => {
+    scrollToCurrentSong();
+  }, 120);
+}
+
+function closePlaylistDrawer() {
+  if (!playlistDrawerWrap) return;
+  playlistDrawerWrap.classList.remove('is-open');
+  if (playlistToggle) playlistToggle.setAttribute('aria-expanded', 'false');
+  clearTimeout(drawerCloseTimer);
+  drawerCloseTimer = setTimeout(() => {
+    if (!playlistDrawerWrap.classList.contains('is-open')) {
+      playlistDrawerWrap.hidden = true;
+    }
+  }, 380);
+}
+
+function togglePlaylistDrawer() {
+  if (playlistDrawerWrap && playlistDrawerWrap.classList.contains('is-open')) {
+    closePlaylistDrawer();
+  } else {
+    openPlaylistDrawer();
+  }
+}
+
+// Wire up events
+if (playlistToggle) {
+  playlistToggle.addEventListener('click', togglePlaylistDrawer);
+}
+if (playlistCloseBtn) {
+  playlistCloseBtn.addEventListener('click', closePlaylistDrawer);
+}
+if (playlistBackdrop) {
+  playlistBackdrop.addEventListener('click', closePlaylistDrawer);
+}
+
+if (playlistItemsScroll) {
+  playlistItemsScroll.addEventListener('click', (e) => {
+    const itemBtn = e.target.closest('.playlist-item');
+    if (!itemBtn) return;
+    const index = parseInt(itemBtn.dataset.index, 10);
+    if (!Number.isNaN(index) && playlist[index]) {
+      if (!state.isJourneyStarted) {
+        startJourney();
+      }
+      setTrack(index, true);
+      updatePlaylistActiveState();
+      notify(`Playing: ${playlist[index].title}`);
+    }
+  });
+}
+
+if (playlistSearch) {
+  playlistSearch.addEventListener('input', (e) => {
+    const val = e.target.value;
+    if (playlistSearchClear) {
+      playlistSearchClear.hidden = !val;
+    }
+    renderPlaylist(val);
+  });
+}
+
+if (playlistSearchClear) {
+  playlistSearchClear.addEventListener('click', () => {
+    if (playlistSearch) {
+      playlistSearch.value = '';
+      playlistSearch.focus();
+    }
+    playlistSearchClear.hidden = true;
+    renderPlaylist('');
+  });
+}
+
+if (drawerJumpBtn) {
+  drawerJumpBtn.addEventListener('click', scrollToCurrentSong);
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && playlistDrawerWrap && !playlistDrawerWrap.hidden) {
+    closePlaylistDrawer();
+  }
+});
+
+// Set playlist count badges
+if (playlistCountBadge) playlistCountBadge.textContent = String(playlist.length);
+if (playlistSubtitle) playlistSubtitle.textContent = `${playlist.length} songs`;
+
+// Initialize list rendering
+renderPlaylist('');
+updatePlaylistActiveState();
+
+/* ==========================================================================
+   Apple-Style Fullscreen Controller (Enter / Exit)
+   ========================================================================== */
+function isFullscreenActive() {
+  return Boolean(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement
+  );
+}
+
+function updateFullscreenUI() {
+  if (!els.fullscreenBtn) return;
+  const active = isFullscreenActive();
+  els.fullscreenBtn.classList.toggle('is-active', active);
+  els.fullscreenBtn.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Enter fullscreen');
+  els.fullscreenBtn.title = active ? 'Exit Fullscreen' : 'Enter Fullscreen';
+}
+
+function toggleFullscreen() {
+  const doc = document;
+  const docEl = document.documentElement;
+
+  if (!isFullscreenActive()) {
+    const requestFs =
+      docEl.requestFullscreen ||
+      docEl.webkitRequestFullscreen ||
+      docEl.mozRequestFullScreen ||
+      docEl.msRequestFullscreen;
+    if (requestFs) {
+      try {
+        const res = requestFs.call(docEl);
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {});
+        }
+      } catch (e) {}
+    }
+  } else {
+    const exitFs =
+      doc.exitFullscreen ||
+      doc.webkitExitFullscreen ||
+      doc.mozCancelFullScreen ||
+      doc.msExitFullscreen;
+    if (exitFs) {
+      try {
+        const res = exitFs.call(doc);
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {});
+        }
+      } catch (e) {}
+    }
+  }
+  setTimeout(updateFullscreenUI, 80);
+}
+
+if (els.fullscreenBtn) {
+  els.fullscreenBtn.addEventListener('click', toggleFullscreen);
+}
+
+['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach((evt) => {
+  document.addEventListener(evt, updateFullscreenUI);
+});
+updateFullscreenUI();
+
+

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=2" />
+    <link rel="stylesheet" href="./src/styles.css?v=14" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -25,6 +25,39 @@
       <header class="brand" aria-label="KSRTC Radio">
         <span class="crest"><img src="https://upload.wikimedia.org/wikipedia/en/7/71/Kerala_State_Road_Transport_Corporation_logo.png" alt="Kerala State Road Transport Corporation logo" /></span><span>KSRTC RADIO</span>
       </header>
+
+      <div class="top-nav-actions" id="top-nav-actions">
+        <button id="fullscreen-btn" class="top-action-btn fullscreen-btn" aria-label="Enter fullscreen" title="Enter Fullscreen" type="button">
+          <svg class="icon-fs-enter" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 3.5H5.5A2 2 0 0 0 3.5 5.5V8" />
+            <path d="M16 3.5h2.5a2 2 0 0 1 2 2V8" />
+            <path d="M8 20.5H5.5a2 2 0 0 1-2-2V16" />
+            <path d="M16 20.5h2.5a2 2 0 0 0 2-2V16" />
+          </svg>
+          <svg class="icon-fs-exit" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 8.5h2.5a2 2 0 0 0 2-2V4" />
+            <path d="M20 8.5h-2.5a2 2 0 0 1-2-2V4" />
+            <path d="M4 15.5h2.5a2 2 0 0 1 2 2V20" />
+            <path d="M20 15.5h-2.5a2 2 0 0 0-2 2V20" />
+          </svg>
+        </button>
+
+        <button id="replay" class="top-action-btn replay replay-btn" aria-label="Restart journey" title="Restart journey" hidden type="button">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.5 8c-1.3-3.2-4.4-5.5-8-5.5-4.7 0-8.5 3.8-8.5 8.5s3.8 8.5 8.5 8.5c4.1 0 7.5-2.9 8.3-6.8" />
+            <polyline points="16 8 20.5 8 20.5 3.5" />
+          </svg>
+        </button>
+
+        <button id="playlist-toggle" class="playlist-toggle" aria-label="Open playlist" aria-expanded="false" title="Playing list" type="button">
+          <svg class="playlist-hamburger-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" aria-hidden="true">
+            <line x1="4" y1="6.5" x2="20" y2="6.5"></line>
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="17.5" x2="20" y2="17.5"></line>
+          </svg>
+          <span class="playlist-btn-label">Songs</span>
+        </button>
+      </div>
 
       <section class="intro" id="intro" aria-label="Start your journey">
         <div class="welcome-copy">
@@ -69,7 +102,8 @@
           <p class="eyebrow">✦ KERALA STATE ROAD TRANSPORT CORPORATION ✦</p>
           <h2>Starting your journey</h2>
           <div class="loading-track"><span id="loading-bar"></span></div>
-          <p class="loading-note" id="loading-status">Starting the engine • Next stop: Nostalgia…</p>
+          <p class="loading-note" id="loading-status">Starting your ride in 8 seconds…</p>
+          <button type="button" class="board-now-btn" id="board-now-btn" aria-label="Board bus now">Board Bus Now <span>→</span></button>
         </div>
       </section>
 
@@ -88,6 +122,31 @@
             <div class="time-row"><span id="current-time">0:00</span><span id="duration">0:00</span></div>
           </div>
         </div>
+
+        <div class="sound-bars">
+          <div class="bus-sound-bar" aria-label="Bus running sound control">
+            <button type="button" class="bus-sound-toggle" id="bus-sound-toggle" aria-label="Turn off bus sound">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM5 11l1.5-6h11L19 11H5z"/></svg>
+              <span id="bus-sound-label">Bus Sound</span>
+            </button>
+            <div class="bus-sound-slider-wrap">
+              <input id="bus-sound-slider" class="bus-sound-slider" aria-label="Adjust bus sound volume" type="range" min="0" max="100" value="30" />
+            </div>
+            <span class="bus-sound-value" id="bus-sound-value">30%</span>
+          </div>
+
+          <div class="bus-sound-bar rain-sound-bar is-disabled" id="rain-sound-bar" aria-label="Rain sound volume control" aria-disabled="true">
+            <button type="button" class="bus-sound-toggle rain-sound-toggle" id="rain-sound-toggle" aria-label="Turn off rain sound" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14a4 4 0 0 1 7.76-1.33A5 5 0 0 1 21 15a4 4 0 0 1-4 4H5a4 4 0 0 1-1-5zm4 7a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1zm4 0a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1zm4 0a1 1 0 0 1-1-1v-2a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1z"/></svg>
+              <span id="rain-sound-label">Rain Sound</span>
+            </button>
+            <div class="bus-sound-slider-wrap">
+              <input id="rain-sound-slider" class="bus-sound-slider rain-sound-slider" aria-label="Adjust rain sound volume" type="range" min="0" max="100" value="80" disabled />
+            </div>
+            <span class="bus-sound-value rain-sound-value" id="rain-sound-value">80%</span>
+          </div>
+        </div>
+
         <nav class="controls" aria-label="Journey controls">
           <button class="circle-action stop-action" id="make-stop" aria-label="Make a stop">
             <span class="icon">
@@ -122,11 +181,61 @@
         </nav>
       </section>
 
-      <div id="yt-player-wrap" style="position:fixed;bottom:0;right:0;width:200px;height:200px;opacity:1;pointer-events:none;z-index:-999;"><div id="yt-player"></div></div>
-      <button id="replay" class="replay" aria-label="Replay journey introduction" hidden>↺</button>
+      <div id="yt-player-wrap" style="position:fixed;bottom:-250px;right:-250px;width:200px;height:200px;opacity:0.001;pointer-events:none;z-index:-999;-webkit-transform:translateZ(0);transform:translateZ(0);"><div id="yt-player"></div></div>
       <div id="toast" class="toast" role="status"></div>
+
+      <div id="insta-modal" class="insta-modal" hidden aria-modal="true" role="dialog" aria-labelledby="insta-modal-title">
+        <div class="insta-modal-backdrop" id="insta-modal-backdrop"></div>
+        <div class="insta-modal-card">
+          <h3 id="insta-modal-title" class="insta-modal-title">Open in Browser</h3>
+          <p class="insta-modal-desc">
+            Instagram restricts background audio. Open in your browser to play music.
+          </p>
+          <div class="insta-modal-buttons">
+            <button type="button" class="insta-modal-btn primary" id="insta-open-btn">Open in Browser</button>
+            <button type="button" class="insta-modal-btn secondary" id="insta-dismiss-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Apple-Style Playlist Drawer / Sheet -->
+      <div id="playlist-drawer-wrap" class="playlist-drawer-wrap" hidden aria-modal="true" role="dialog" aria-label="Playing List">
+        <div class="playlist-backdrop" id="playlist-backdrop"></div>
+        <aside class="playlist-drawer" id="playlist-drawer">
+          <div class="playlist-drag-handle" aria-hidden="true"></div>
+
+          <header class="playlist-header">
+            <div class="playlist-header-left">
+              <h2 class="playlist-title">Playing List</h2>
+              <span class="playlist-subtitle" id="playlist-subtitle">169 songs</span>
+            </div>
+            <button type="button" class="playlist-close-btn" id="playlist-close-btn" aria-label="Close playing list">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </header>
+
+          <div class="playlist-search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="search" id="playlist-search" class="playlist-search-input" placeholder="Search songs, movies, artists…" aria-label="Search playlist" autocomplete="off" spellcheck="false" />
+            <button type="button" id="playlist-search-clear" class="playlist-search-clear" aria-label="Clear search" hidden>✕</button>
+          </div>
+
+          <div class="playlist-now-playing-banner" id="playlist-now-playing-banner">
+            <div class="now-playing-pill">NOW PLAYING</div>
+            <div class="now-playing-info">
+              <span class="now-playing-title" id="drawer-current-title">--</span>
+              <span class="now-playing-artist" id="drawer-current-artist">--</span>
+            </div>
+            <button type="button" class="drawer-jump-btn" id="drawer-jump-btn" title="Scroll to current song">Jump to Song</button>
+          </div>
+
+          <div class="playlist-items-scroll" id="playlist-items-scroll" role="list">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </aside>
+      </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=2"></script>
+    <script type="module" src="./src/app.js?v=16"></script>
   </body>
 </html>
