@@ -496,6 +496,8 @@ function toggleRain() {
 
 let stopFallbackTimer = null;
 
+let wasMusicPlayingBeforeStop = false;
+
 function makeStop() {
   if (state.isStopping || !state.isJourneyStarted) return;
   if (state.isRainMode) {
@@ -514,6 +516,10 @@ function makeStop() {
     stopVideo.src = journeyConfig.videos.stop;
   }
 
+  // Enable audio for stop video and set realistic volume
+  stopVideo.muted = false;
+  stopVideo.volume = journeyConfig.volumes.effects ?? 0.9;
+
   try {
     stopVideo.currentTime = 0;
   } catch (e) {}
@@ -522,9 +528,20 @@ function makeStop() {
   journey.classList.remove('is-visible');
   stopVideo.classList.add('is-visible');
 
+  // Pause music during the stop sequence so the bus stop audio is clearly heard
+  wasMusicPlayingBeforeStop = state.isPlaying;
+  if (wasMusicPlayingBeforeStop) {
+    pauseMusic();
+  }
+
   const playPromise = playSafe(stopVideo);
   if (playPromise && typeof playPromise.catch === 'function') {
     playPromise.catch(() => {
+      // Fallback: if browser blocks unmuted playback, try muted
+      if (stopVideo.muted === false) {
+        stopVideo.muted = true;
+        playSafe(stopVideo);
+      }
       clearTimeout(stopFallbackTimer);
       stopFallbackTimer = setTimeout(onStopEnded, 1800);
     });
@@ -743,7 +760,9 @@ function resetJourney() {
   }
   stopVideo.pause();
   stopVideo.currentTime = 0;
+  stopVideo.muted = true;
   stopVideo.classList.remove('is-visible');
+  wasMusicPlayingBeforeStop = false;
   rainVideo.pause();
   rainVideo.currentTime = 0;
   rainVideo.classList.remove('is-visible');
@@ -905,12 +924,17 @@ function onStopEnded() {
     if (stopLabel) stopLabel.textContent = 'Make a Stop';
     try {
       stopVideo.pause();
+      stopVideo.muted = true;
     } catch (e) {}
     stopVideo.classList.remove('is-visible');
     journey.classList.add('is-visible');
     playSafe(journey);
     state.currentVideo = 'journey';
     syncRunAudio();
+    if (wasMusicPlayingBeforeStop) {
+      playMusic();
+      wasMusicPlayingBeforeStop = false;
+    }
     notify('Journey resumed.');
   }
 }
