@@ -47,6 +47,13 @@ const savedRainVolume = (() => {
 let currentRainVolume = savedRainVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRainVolume, 10))) : Math.round((journeyConfig.volumes.rain ?? 0.8) * 100);
 let lastNonZeroRainVolume = currentRainVolume > 0 ? currentRainVolume : 80;
 
+// Bus running sound state & user volume preference
+const savedRunVolume = (() => {
+  try { return localStorage.getItem('ksrtc_bus_sound_volume'); } catch (e) { return null; }
+})();
+let currentRunVolume = savedRunVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRunVolume, 10))) : Math.round((journeyConfig.volumes.run ?? 0.3) * 100);
+let lastNonZeroRunVolume = currentRunVolume > 0 ? currentRunVolume : 30;
+
 const rainAudio = new Audio(journeyConfig.sounds.rain);
 rainAudio.loop = true;
 rainAudio.preload = 'auto';
@@ -123,15 +130,6 @@ function updateRainBarState(isRainActive) {
 
 updateRainSoundUI(currentRainVolume);
 updateRainBarState(false);
-
-// Bus running sound state & user volume preference
-const savedRunVolume = (() => {
-  try { return localStorage.getItem('ksrtc_bus_sound_volume'); } catch (e) { return null; }
-})();
-let currentRunVolume = savedRunVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRunVolume, 10))) : Math.round((journeyConfig.volumes.run ?? 0.3) * 100);
-let lastNonZeroRunVolume = currentRunVolume > 0 ? currentRunVolume : 30;
-
-runAudio.volume = currentRunVolume / 100;
 
 function updateBusSoundUI(volume) {
   if (els.busSoundSlider) {

@@ -4,7 +4,7 @@ import { networkInterfaces } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 
 const root = process.cwd();
-const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.png':'image/png', '.jpg':'image/jpeg', '.mp4':'video/mp4', '.mp3':'audio/mpeg' };
+const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.png':'image/png', '.jpg':'image/jpeg', '.webp':'image/webp', '.mp4':'video/mp4', '.mp3':'audio/mpeg', '.m4a':'audio/mp4' };
 createServer((request, response) => {
   const url = new URL(request.url, 'http://localhost');
   const relative = url.pathname === '/' ? '/index.html' : url.pathname;
