@@ -4,17 +4,18 @@ body { margin:0; min-width:320px; overflow:hidden; background:#10110f; color:#fa
 button, input { font:inherit; }
 button { color:inherit; cursor:pointer; }
 .app { min-height:100svh; position:relative; isolation:isolate; overflow:hidden; }
-.scene, .scene video, .fallback, .vignette { position:absolute; inset:0; width:100%; height:100%; }
+.scene, .scene video, .fallback, .fallback-picture, .fallback-picture img, .vignette { position:absolute; inset:0; width:100%; height:100%; }
 .scene { background:#12130f; z-index:-2; }
-.scene video, .fallback { object-fit:cover; object-position:center center; }
+.scene video, .fallback, .fallback-picture img { object-fit:cover; object-position:center center; }
 .scene video { opacity:0; transition:none; }
 .scene video.is-visible { opacity:1; }
-.fallback { filter:saturate(.86) brightness(.73); transform:scale(1.012); }
+.fallback, .fallback-picture img { filter:saturate(.86) brightness(.73); transform:scale(1.012); }
 
 @media (max-width: 768px), (orientation: portrait) {
   #journey-video,
   #rain-video,
   .fallback,
+  .fallback-picture img,
   #scene-video[data-kind="rain"],
   #scene-video.is-rain {
     object-position: 65% center;

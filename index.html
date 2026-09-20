@@ -23,25 +23,29 @@
       name="twitter:description"
       content="A nostalgic Kerala bus journey with classic Malayalam melodies, ambient engine sounds, rain, and the soul of ആനവണ്ടി."
     />
+    <link rel="preload" as="image" href="./assets/images/ksrtc-journey-fallback.webp" type="image/webp" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=15" />
+    <link rel="stylesheet" href="./src/styles.css?v=16" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
     <main id="app" class="app intro-active" aria-live="polite">
       <div class="scene" aria-hidden="true">
-        <img class="fallback" src="./assets/images/ksrtc-journey-fallback.png" alt="" />
+        <picture class="fallback-picture">
+          <source srcset="./assets/images/ksrtc-journey-fallback.webp" type="image/webp" />
+          <img class="fallback" src="./assets/images/ksrtc-journey-fallback.png" alt="" fetchpriority="high" loading="eager" decoding="async" />
+        </picture>
         <video id="journey-video" muted loop playsinline preload="auto" src="./assets/videos/Sunnyride.mp4"></video>
-        <video id="rain-video" muted loop playsinline preload="auto" src="./assets/videos/rain.mp4"></video>
-        <video id="stop-video" muted playsinline preload="auto" src="./assets/videos/gettingout.mp4"></video>
+        <video id="rain-video" muted loop playsinline preload="none" src="./assets/videos/rain.mp4"></video>
+        <video id="stop-video" muted playsinline preload="none" src="./assets/videos/gettingout.mp4"></video>
         <video id="scene-video" muted playsinline preload="none" hidden></video>
       </div>
       <div class="vignette" aria-hidden="true"></div>
 
       <header class="brand" aria-label="KSRTC Radio">
-        <span class="crest"><img src="https://upload.wikimedia.org/wikipedia/en/7/71/Kerala_State_Road_Transport_Corporation_logo.png" alt="Kerala State Road Transport Corporation logo" /></span><span>KSRTC RADIO</span>
+        <span class="crest"><img src="./assets/images/ksrtc-logo.png" alt="Kerala State Road Transport Corporation logo" width="44" height="44" /></span><span>KSRTC RADIO</span>
       </header>
 
       <div class="top-nav-actions" id="top-nav-actions">
@@ -79,7 +83,7 @@
 
       <section class="intro" id="intro" aria-label="Start your journey">
         <div class="welcome-copy">
-          <div class="intro-seal"><img src="https://upload.wikimedia.org/wikipedia/en/7/71/Kerala_State_Road_Transport_Corporation_logo.png" alt="Kerala State Road Transport Corporation logo" /></div>
+          <div class="intro-seal"><img src="./assets/images/ksrtc-logo.png" alt="Kerala State Road Transport Corporation logo" width="116" height="116" /></div>
           <p class="intro-title">KSRTC RADIO</p>
           <p class="intro-tagline">MUSIC <b>•</b> ROADS <b>•</b> MEMORIES</p>
           <span class="intro-rule" aria-hidden="true"></span>
@@ -130,7 +134,7 @@
           <div class="album-art">
             <img id="album-art" src="https://img.youtube.com/vi/IL4H0erw0Bk/hqdefault.jpg" alt="Album art" />
             <span class="player-logo-badge" title="Kerala State Road Transport Corporation">
-              <img src="https://upload.wikimedia.org/wikipedia/en/7/71/Kerala_State_Road_Transport_Corporation_logo.png" alt="KSRTC logo" />
+              <img src="./assets/images/ksrtc-logo.png" alt="KSRTC logo" width="25" height="25" />
             </span>
           </div>
           <div class="track-meta">

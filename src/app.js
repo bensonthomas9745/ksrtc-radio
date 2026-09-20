@@ -49,8 +49,46 @@ let lastNonZeroRainVolume = currentRainVolume > 0 ? currentRainVolume : 80;
 
 const rainAudio = new Audio(journeyConfig.sounds.rain);
 rainAudio.loop = true;
-rainAudio.preload = 'none';
+rainAudio.preload = 'auto';
 rainAudio.volume = currentRainVolume / 100;
+
+const runAudio = new Audio(journeyConfig.sounds.run);
+runAudio.loop = true;
+runAudio.preload = 'auto';
+runAudio.volume = currentRunVolume / 100;
+
+const hornAudio = new Audio(journeyConfig.sounds.horn);
+hornAudio.preload = 'auto';
+hornAudio.volume = journeyConfig.volumes.effects;
+
+const bellAudio = new Audio(journeyConfig.sounds.busBell);
+bellAudio.preload = 'auto';
+bellAudio.volume = journeyConfig.volumes.effects;
+
+const startAudio = new Audio(journeyConfig.sounds.journeyStart);
+startAudio.preload = 'auto';
+startAudio.volume = 1;
+
+function preloadAudioAssets() {
+  try {
+    runAudio.load();
+    rainAudio.load();
+    hornAudio.load();
+    bellAudio.load();
+    startAudio.load();
+  } catch (e) {}
+}
+
+function playSoundEffect(audioObj) {
+  if (!audioObj) return;
+  try {
+    audioObj.currentTime = 0;
+    const p = audioObj.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {});
+    }
+  } catch (e) {}
+}
 
 function updateRainSoundUI(volume) {
   if (els.rainSoundSlider) {
@@ -93,9 +131,6 @@ const savedRunVolume = (() => {
 let currentRunVolume = savedRunVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRunVolume, 10))) : Math.round((journeyConfig.volumes.run ?? 0.3) * 100);
 let lastNonZeroRunVolume = currentRunVolume > 0 ? currentRunVolume : 30;
 
-const runAudio = new Audio(journeyConfig.sounds.run);
-runAudio.loop = true;
-runAudio.preload = 'none';
 runAudio.volume = currentRunVolume / 100;
 
 function updateBusSoundUI(volume) {
@@ -137,17 +172,11 @@ function initJourneyVideo() {
   journey.preload = 'auto';
   journey.loop = true;
 
-  journey.addEventListener('ended', () => {
-    journey.currentTime = 0;
-    playSafe(journey);
-  });
-
   const onReady = () => {
     preloadStatus.journey = true;
     checkAllLoadedAndFinish();
   };
 
-  // 1. Immediately attach progressive source so first frame and chunks buffer right away
   journey.src = journeyConfig.videos.journey;
   if (journey.readyState >= 3) {
     preloadStatus.journey = true;
@@ -157,29 +186,6 @@ function initJourneyVideo() {
     journey.addEventListener('error', onReady, { once: true });
   }
   journey.load();
-
-  // 2. Concurrently fetch the entire video into RAM as a Blob for zero-buffer looping
-  fetch(journeyConfig.videos.journey)
-    .then(res => (res.ok ? res.blob() : null))
-    .then(blob => {
-      if (!blob) return;
-      journeyBlobUrl = URL.createObjectURL(blob);
-      if (!state.isJourneyStarted) {
-        journey.src = journeyBlobUrl;
-        journey.load();
-        preloadStatus.journey = true;
-      } else {
-        journey.addEventListener('ended', () => {
-          if (journey.src !== journeyBlobUrl) {
-            journey.src = journeyBlobUrl;
-            journey.load();
-            journey.currentTime = 0;
-            playSafe(journey);
-          }
-        }, { once: true });
-      }
-    })
-    .catch(() => {});
 }
 
 function initSecondaryVideos() {
@@ -198,13 +204,11 @@ function initSecondaryVideos() {
   stopVideo.load();
 }
 
-// Load primary journey video once into RAM for buffer-free looping
+// Immediately initialize primary journey video
 initJourneyVideo();
-// Immediately initialize secondary videos so make-stop and rain are instantly responsive
-initSecondaryVideos();
 
 function preloadSecondaryVideos() {
-  // Maintained for backward compatibility; videos are already initialized upfront
+  initSecondaryVideos();
 }
 
 let ytPlayer = null;
@@ -220,7 +224,7 @@ function initYTPlayer() {
       width: '200',
       videoId: playlist[state.currentSongIndex].id,
       playerVars: {
-        autoplay: 1,
+        autoplay: 0,
         controls: 0,
         disablekb: 1,
         fs: 0,
@@ -233,21 +237,16 @@ function initYTPlayer() {
         onReady: () => {
           ytReady = true;
           try {
-            if (ytPlayer.unMute) ytPlayer.unMute();
             if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
-            // Automatically play video immediately when ready
-            if (ytPlayer.playVideo) {
-              ytPlayer.playVideo();
-            } else if (ytPlayer.loadVideoById) {
-              ytPlayer.loadVideoById(playlist[state.currentSongIndex].id);
+            // Only play if the journey has actually started and finished the loading screen!
+            if (hasFinished && state.isPlaying) {
+              if (ytPlayer.unMute) ytPlayer.unMute();
+              if (ytPlayer.playVideo) ytPlayer.playVideo();
             }
-            state.isPlaying = true;
-            els.play.classList.add('is-playing');
-            els.play.setAttribute('aria-label', 'Pause');
           } catch (e) {
-            console.warn('Initial play attempt error:', e);
+            console.warn('Initial play check error:', e);
           }
-          if (pendingTrack !== null) {
+          if (pendingTrack !== null && hasFinished) {
             setTrack(pendingTrack.index, pendingTrack.shouldPlay !== false);
             pendingTrack = null;
           }
@@ -509,7 +508,7 @@ function makeStop() {
   els.stop.classList.add('is-stopping');
   const label = els.stop.querySelector('small');
   if (label) label.textContent = 'Stopping…';
-  effect(journeyConfig.sounds.busBell);
+  playSoundEffect(bellAudio);
 
   if (!stopVideo.src || stopVideo.src === window.location.href) {
     stopVideo.src = journeyConfig.videos.stop;
@@ -557,29 +556,21 @@ function startJourney() {
   els.start.disabled = true;
   els.intro.classList.add('is-starting');
 
-  // Trigger song playback synchronously on user gesture so mobile browsers authorize audio
-  state.isPlaying = true;
-  els.play.classList.add('is-playing');
-  els.play.setAttribute('aria-label', 'Pause');
+  // Preload all audio assets on this user gesture so they are ready when loading finishes
+  preloadAudioAssets();
+
+  // Mobile gesture unlock: cue current track without playing audio yet
   if (ytPlayer && ytReady) {
     try {
-      if (ytPlayer.unMute) ytPlayer.unMute();
-      if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
-      if (ytPlayer.playVideo) {
-        ytPlayer.playVideo();
-      } else if (ytPlayer.loadVideoById) {
-        ytPlayer.loadVideoById(playlist[state.currentSongIndex].id);
+      if (ytPlayer.mute) ytPlayer.mute();
+      if (ytPlayer.cueVideoById) {
+        ytPlayer.cueVideoById(playlist[state.currentSongIndex].id);
       }
-    } catch (e) {
-      playMusic();
-    }
-  } else {
-    pendingTrack = { index: state.currentSongIndex, shouldPlay: true };
+    } catch (e) {}
   }
 
-  const startupSound = effect(journeyConfig.sounds.journeyStart);
-  startupSound.volume = 1;
-  currentStartupSound = startupSound;
+  currentStartupSound = startAudio;
+  playSoundEffect(startAudio);
 
   const STARTUP_DURATION_MS = 8000;
   let animId = null;
@@ -626,8 +617,8 @@ function startJourney() {
     checkAllLoadedAndFinish();
   };
 
-  startupSound.addEventListener('ended', onEngineComplete, { once: true });
-  startupSound.addEventListener('error', onEngineComplete, { once: true });
+  startAudio.addEventListener('ended', onEngineComplete, { once: true });
+  startAudio.addEventListener('error', onEngineComplete, { once: true });
 
   state.startTimer = setTimeout(onEngineComplete, STARTUP_DURATION_MS);
 
@@ -839,14 +830,14 @@ let hornTimer = null;
 let bellTimer = null;
 
 function triggerHorn() {
-  effect(journeyConfig.sounds.horn);
+  playSoundEffect(hornAudio);
   els.horn.classList.add('is-pressed');
   clearTimeout(hornTimer);
   hornTimer = setTimeout(() => els.horn.classList.remove('is-pressed'), 1400);
 }
 
 function triggerBell() {
-  effect(journeyConfig.sounds.busBell);
+  playSoundEffect(bellAudio);
   els.bell.classList.add('is-pressed');
   clearTimeout(bellTimer);
   bellTimer = setTimeout(() => els.bell.classList.remove('is-pressed'), 1200);
@@ -939,8 +930,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') setTrack(state.currentSongIndex - 1, true);
 });
 
-// Auto-unlock music on the very first user interaction if browser blocked autoplay on initial load
+// Auto-unlock music on user interaction only AFTER the loading screen has finished
 const unlockAudioOnFirstTouch = () => {
+  if (!hasFinished || !state.isJourneyStarted) return;
   window.removeEventListener('pointerdown', unlockAudioOnFirstTouch);
   window.removeEventListener('touchstart', unlockAudioOnFirstTouch);
   window.removeEventListener('click', unlockAudioOnFirstTouch);
