@@ -574,20 +574,11 @@ function startJourney() {
   // Preload all audio assets on this user gesture so they are ready when loading finishes
   preloadAudioAssets();
 
-  // Mobile gesture unlock: cue current track without playing audio yet
-  if (ytPlayer && ytReady) {
-    try {
-      if (ytPlayer.mute) ytPlayer.mute();
-      if (ytPlayer.cueVideoById) {
-        ytPlayer.cueVideoById(playlist[state.currentSongIndex].id);
-      }
-    } catch (e) {}
-  }
-
   currentStartupSound = startAudio;
   playSoundEffect(startAudio);
 
-  const STARTUP_DURATION_MS = 8000;
+  // 4.2 seconds keeps the screen reveal within the browser's 5s user activation window
+  const STARTUP_DURATION_MS = 4200;
   let animId = null;
   const startTime = performance.now();
 
@@ -637,7 +628,7 @@ function startJourney() {
 
   state.startTimer = setTimeout(onEngineComplete, STARTUP_DURATION_MS);
 
-  // Absolute safety timeout: never hang forever
+  // Safety timeout: never hang forever
   setTimeout(() => {
     if (!hasFinished) {
       cancelAnimationFrame(animId);
@@ -645,7 +636,7 @@ function startJourney() {
       preloadStatus.minTimerPassed = true;
       finishLoading();
     }
-  }, 9500);
+  }, 5500);
 }
 
 const finishLoading = () => {
@@ -678,26 +669,8 @@ const finishLoading = () => {
   els.replay.hidden = false;
   updateRainBarState(state.isRainMode);
 
-  // Automatically ensure music playback is active when the ride reveals
-  state.isPlaying = true;
-  els.play.classList.add('is-playing');
-  els.play.setAttribute('aria-label', 'Pause');
-  if (ytPlayer && ytReady) {
-    try {
-      const pState = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
-      if (pState !== YT.PlayerState.PLAYING && pState !== YT.PlayerState.BUFFERING) {
-        if (ytPlayer.playVideo) {
-          ytPlayer.playVideo();
-        }
-      }
-    } catch (e) {
-      playMusic();
-    }
-  } else {
-    pendingTrack = { index: state.currentSongIndex, shouldPlay: true };
-  }
-  syncRunAudio();
-  syncRainAudio();
+  // Start music playback with unMute and full volume now that the screen reveals
+  playMusic();
 
   // When opened in Instagram browser only: pop in guidance message in song screen
   if (isInstagramOrInApp && !hasShownInstaModal) {
@@ -808,7 +781,7 @@ function resetJourney() {
     loadingBar.style.setProperty('--loading-progress', '0%');
   }
   if (loadingStatus) {
-    loadingStatus.textContent = 'Starting your ride in 8 seconds…';
+    loadingStatus.textContent = 'Starting your ride in 4 seconds…';
   }
 }
 
@@ -952,12 +925,19 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') setTrack(state.currentSongIndex - 1, true);
 });
 
-// Auto-unlock music on user interaction only AFTER the loading screen has finished
+// Auto-unlock and unmute music on user interaction only AFTER the loading screen has finished
 const unlockAudioOnFirstTouch = () => {
   if (!hasFinished || !state.isJourneyStarted) return;
-  window.removeEventListener('pointerdown', unlockAudioOnFirstTouch);
-  window.removeEventListener('touchstart', unlockAudioOnFirstTouch);
-  window.removeEventListener('click', unlockAudioOnFirstTouch);
+  if (ytPlayer && ytReady) {
+    try {
+      if (ytPlayer.isMuted && ytPlayer.isMuted()) {
+        ytPlayer.unMute();
+      }
+      if (ytPlayer.getVolume && ytPlayer.getVolume() === 0) {
+        ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+      }
+    } catch (e) {}
+  }
   if (!state.isPlaying && ytPlayer && ytReady) {
     playMusic();
   }
