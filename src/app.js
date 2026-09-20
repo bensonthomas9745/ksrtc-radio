@@ -577,8 +577,7 @@ function startJourney() {
   currentStartupSound = startAudio;
   playSoundEffect(startAudio);
 
-  // 4.2 seconds keeps the screen reveal within the browser's 5s user activation window
-  const STARTUP_DURATION_MS = 4200;
+  const STARTUP_DURATION_MS = 8000;
   let animId = null;
   const startTime = performance.now();
 
@@ -636,7 +635,7 @@ function startJourney() {
       preloadStatus.minTimerPassed = true;
       finishLoading();
     }
-  }, 5500);
+  }, 9500);
 }
 
 const finishLoading = () => {
@@ -781,7 +780,7 @@ function resetJourney() {
     loadingBar.style.setProperty('--loading-progress', '0%');
   }
   if (loadingStatus) {
-    loadingStatus.textContent = 'Starting your ride in 4 seconds…';
+    loadingStatus.textContent = 'Starting your ride in 8 seconds…';
   }
 }
 
