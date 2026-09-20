@@ -156,6 +156,7 @@ const preloadStatus = {
   minTimerPassed: false
 };
 let hasFinished = false;
+let hasTriggeredEarlySong = false;
 
 function checkAllLoadedAndFinish() {
   if (!state.isJourneyStarted || hasFinished) return;
@@ -568,6 +569,7 @@ function startJourney() {
   if (state.isJourneyStarted) return;
   state.isJourneyStarted = true;
   hasFinished = false;
+  hasTriggeredEarlySong = false;
   els.start.disabled = true;
   els.intro.classList.add('is-starting');
 
@@ -606,6 +608,12 @@ function startJourney() {
         loadingStatus.textContent = 'All aboard! Welcome aboard KSRTC Radio…';
       } else {
         loadingStatus.textContent = `Starting your ride in ${remainingSec} second${remainingSec === 1 ? '' : 's'}…`;
+      }
+
+      // Start the song when the countdown reads 2 seconds remaining
+      if (remainingSec <= 2 && !hasTriggeredEarlySong && !hasFinished) {
+        hasTriggeredEarlySong = true;
+        playMusic();
       }
     }
 
@@ -668,8 +676,10 @@ const finishLoading = () => {
   els.replay.hidden = false;
   updateRainBarState(state.isRainMode);
 
-  // Start music playback with unMute and full volume now that the screen reveals
-  playMusic();
+  // Ensure music playback is active
+  if (!state.isPlaying) {
+    playMusic();
+  }
 
   // When opened in Instagram browser only: pop in guidance message in song screen
   if (isInstagramOrInApp && !hasShownInstaModal) {
@@ -774,6 +784,7 @@ function resetJourney() {
   app.classList.add('intro-active');
   els.start.disabled = false;
   hasFinished = false;
+  hasTriggeredEarlySong = false;
   preloadStatus.minTimerPassed = false;
   if (loadingBar) {
     loadingBar.style.width = '0%';
