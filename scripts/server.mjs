@@ -4,11 +4,16 @@ import { networkInterfaces } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 
 const root = process.cwd();
-const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.png':'image/png', '.jpg':'image/jpeg', '.webp':'image/webp', '.mp4':'video/mp4', '.mp3':'audio/mpeg', '.m4a':'audio/mp4' };
+const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.png':'image/png', '.jpg':'image/jpeg', '.webp':'image/webp', '.mp4':'video/mp4', '.mp3':'audio/mpeg', '.m4a':'audio/mp4', '.xml':'application/xml', '.txt':'text/plain' };
 createServer((request, response) => {
   const url = new URL(request.url, 'http://localhost');
-  const relative = url.pathname === '/' ? '/index.html' : url.pathname;
-  const file = normalize(join(root, relative));
+  let relative = url.pathname === '/' ? '/index.html' : url.pathname;
+  let file = normalize(join(root, relative));
+  if (!existsSync(file) && existsSync(file + '.html')) {
+    file = file + '.html';
+  } else if (existsSync(file) && statSync(file).isDirectory() && existsSync(join(file, 'index.html'))) {
+    file = join(file, 'index.html');
+  }
   if (!file.startsWith(root) || !existsSync(file) || statSync(file).isDirectory()) { response.writeHead(404); response.end('Not found'); return; }
   const stat = statSync(file);
   const total = stat.size;
