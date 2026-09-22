@@ -248,6 +248,7 @@ function initSecondaryVideos() {
   }
   rainVideo.loop = true;
   rainVideo.preload = 'auto';
+  rainVideo.muted = true;
   rainVideo.load();
 
   if (!stopVideo.src || stopVideo.src === window.location.href) {
@@ -255,11 +256,13 @@ function initSecondaryVideos() {
   }
   stopVideo.loop = false;
   stopVideo.preload = 'auto';
+  stopVideo.muted = true;
   stopVideo.load();
 }
 
-// Immediately initialize primary journey video
+// Immediately initialize primary and secondary scene videos
 initJourneyVideo();
+initSecondaryVideos();
 
 function preloadSecondaryVideos() {
   initSecondaryVideos();
@@ -529,32 +532,111 @@ function pauseMusic() {
     runAudio.pause();
   }
 }
+function playVideoSafe(video) {
+  if (!video) return null;
+  const p = playSafe(video);
+  if (p && typeof p.catch === 'function') {
+    p.catch(() => {
+      if (video.muted === false) {
+        video.muted = true;
+        playSafe(video);
+      }
+    });
+  }
+  return p;
+}
+
+function switchSceneVideo(targetVideo, currentVideo, onComplete) {
+  if (!targetVideo) return;
+  if (targetVideo === currentVideo) {
+    targetVideo.classList.add('is-visible');
+    playVideoSafe(targetVideo);
+    if (onComplete) onComplete();
+    return;
+  }
+
+  // Ensure targetVideo is cleanly on top layer during crossfade
+  [journey, rainVideo, stopVideo].forEach((v) => {
+    if (v && v !== targetVideo) {
+      v.classList.remove('is-top');
+    }
+  });
+  targetVideo.classList.add('is-top');
+
+  // Start playing targetVideo before fading it in
+  playVideoSafe(targetVideo);
+
+  let crossFadeTriggered = false;
+  const triggerCrossFade = () => {
+    if (crossFadeTriggered) return;
+    crossFadeTriggered = true;
+
+    // Fade targetVideo in smoothly over currentVideo
+    targetVideo.classList.add('is-visible');
+
+    // Wait for the CSS opacity transition (350ms) to complete before hiding/pausing currentVideo
+    setTimeout(() => {
+      if (currentVideo && currentVideo !== targetVideo) {
+        currentVideo.classList.remove('is-visible', 'is-top');
+        setTimeout(() => {
+          const isStillCurrent = (currentVideo === journey && state.currentVideo === 'journey') ||
+                                (currentVideo === rainVideo && state.currentVideo === 'rain') ||
+                                (currentVideo === stopVideo && state.currentVideo === 'stop');
+          if (!isStillCurrent) {
+            try { currentVideo.pause(); } catch (e) {}
+          }
+        }, 120);
+      }
+      targetVideo.classList.remove('is-top');
+      if (onComplete) onComplete();
+    }, 360);
+  };
+
+  if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+    try {
+      targetVideo.requestVideoFrameCallback(() => {
+        triggerCrossFade();
+      });
+    } catch (e) {
+      triggerCrossFade();
+    }
+  }
+
+  const onPlaySignal = () => {
+    targetVideo.removeEventListener('playing', onPlaySignal);
+    targetVideo.removeEventListener('timeupdate', onPlaySignal);
+    triggerCrossFade();
+  };
+
+  targetVideo.addEventListener('playing', onPlaySignal, { once: true });
+  targetVideo.addEventListener('timeupdate', onPlaySignal, { once: true });
+
+  setTimeout(triggerCrossFade, 200);
+}
+
+let isTogglingRain = false;
 function toggleRain() {
-  if (state.isStopping) return;
+  if (state.isStopping || isTogglingRain) return;
+  isTogglingRain = true;
+  setTimeout(() => { isTogglingRain = false; }, 500);
+
   state.isRainMode = !state.isRainMode;
   els.rain.classList.toggle('active', state.isRainMode);
   els.rain.querySelector('small').textContent = state.isRainMode ? 'Rain On' : 'Rain Off';
   els.rain.setAttribute('aria-label', state.isRainMode ? 'Turn rain off' : 'Turn rain on');
   updateRainBarState(state.isRainMode);
+
   if (state.isRainMode) {
-    journey.pause();
-    journey.classList.remove('is-visible');
-    rainVideo.currentTime = 0;
-    rainVideo.classList.add('is-visible');
-    playSafe(rainVideo);
     state.currentVideo = 'rain';
+    switchSceneVideo(rainVideo, journey);
     rainAudio.volume = currentRainVolume / 100;
-    rainAudio.currentTime = 0;
     syncRainAudio();
     notify('Rain on.');
   } else {
+    state.currentVideo = 'journey';
+    switchSceneVideo(journey, rainVideo);
     rainAudio.pause();
     rainAudio.currentTime = 0;
-    rainVideo.pause();
-    rainVideo.classList.remove('is-visible');
-    journey.classList.add('is-visible');
-    playSafe(journey);
-    state.currentVideo = 'journey';
     notify('Rain off.');
   }
   syncRunAudio();
@@ -563,7 +645,7 @@ function toggleRain() {
 let stopFallbackTimer = null;
 
 function makeStop() {
-  if (state.isStopping || !state.isJourneyStarted) return;
+  if (state.isStopping || !state.isJourneyStarted || isTogglingRain) return;
   if (state.isRainMode) {
     notify('Please turn off rain mode to make a stop.');
     return;
@@ -588,43 +670,27 @@ function makeStop() {
   stopVideo.volume = journeyConfig.volumes.effects ?? 0.9;
 
   try {
-    stopVideo.currentTime = 0;
+    if (stopVideo.currentTime !== 0) {
+      stopVideo.currentTime = 0;
+    }
   } catch (e) {}
-
-  journey.pause();
-  journey.classList.remove('is-visible');
-  stopVideo.classList.add('is-visible');
-
-  // Music continues uninterrupted during the stop sequence
-
-  const playPromise = playSafe(stopVideo);
-  if (playPromise && typeof playPromise.catch === 'function') {
-    playPromise.catch(() => {
-      // Fallback: if browser blocks unmuted playback, try muted
-      if (stopVideo.muted === false) {
-        stopVideo.muted = true;
-        playSafe(stopVideo);
-      }
-      clearTimeout(stopFallbackTimer);
-      stopFallbackTimer = setTimeout(onStopEnded, 1800);
-    });
-  }
 
   state.currentVideo = 'stop';
   notify('Stopping at the next stop…');
 
-  // Watchdog timer: guarantees journey resumes even if device freezes, stalls, or drops video playback
-  clearTimeout(stopFallbackTimer);
-  const dur = (Number.isFinite(stopVideo.duration) && stopVideo.duration > 0)
-    ? stopVideo.duration
-    : 7.5;
-  const timeoutMs = Math.ceil(dur * 1000) + 1200;
+  switchSceneVideo(stopVideo, journey, () => {
+    clearTimeout(stopFallbackTimer);
+    const dur = (Number.isFinite(stopVideo.duration) && stopVideo.duration > 0)
+      ? stopVideo.duration
+      : 7.5;
+    const timeoutMs = Math.ceil(dur * 1000) + 1200;
 
-  stopFallbackTimer = setTimeout(() => {
-    if (state.isStopping) {
-      onStopEnded();
-    }
-  }, timeoutMs);
+    stopFallbackTimer = setTimeout(() => {
+      if (state.isStopping) {
+        onStopEnded();
+      }
+    }, timeoutMs);
+  });
 }
 
 let currentStartupSound = null;
@@ -807,13 +873,13 @@ function resetJourney() {
   stopVideo.pause();
   stopVideo.currentTime = 0;
   stopVideo.muted = true;
-  stopVideo.classList.remove('is-visible');
+  stopVideo.classList.remove('is-visible', 'is-top');
   rainVideo.pause();
   rainVideo.currentTime = 0;
-  rainVideo.classList.remove('is-visible');
+  rainVideo.classList.remove('is-visible', 'is-top');
   journey.pause();
   journey.currentTime = 0;
-  journey.classList.remove('is-visible');
+  journey.classList.remove('is-visible', 'is-top');
   Object.assign(state, {
     isJourneyStarted: false,
     isRainMode: false,
@@ -975,14 +1041,16 @@ function onStopEnded() {
     els.stop.classList.remove('is-stopping');
     const stopLabel = els.stop.querySelector('small');
     if (stopLabel) stopLabel.textContent = 'Make a Stop';
-    try {
-      stopVideo.pause();
-      stopVideo.muted = true;
-    } catch (e) {}
-    stopVideo.classList.remove('is-visible');
-    journey.classList.add('is-visible');
-    playSafe(journey);
+
     state.currentVideo = 'journey';
+    switchSceneVideo(journey, stopVideo, () => {
+      try {
+        stopVideo.pause();
+        stopVideo.muted = true;
+        stopVideo.currentTime = 0;
+      } catch (e) {}
+    });
+
     syncRunAudio();
     notify('Journey resumed.');
   }

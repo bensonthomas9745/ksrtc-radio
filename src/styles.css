@@ -7,8 +7,9 @@ button { color:inherit; cursor:pointer; }
 .scene, .scene video, .fallback, .fallback-picture, .fallback-picture img, .vignette { position:absolute; inset:0; width:100%; height:100%; }
 .scene { background:#12130f; z-index:-2; }
 .scene video, .fallback, .fallback-picture img { object-fit:cover; object-position:center center; }
-.scene video { opacity:0; transition:none; }
+.scene video { opacity:0; transform:translateZ(0); transition:opacity .35s cubic-bezier(.25,1,.5,1); will-change:opacity; }
 .scene video.is-visible { opacity:1; }
+.scene video.is-top { z-index:2; }
 .fallback, .fallback-picture img { filter:saturate(.86) brightness(.73); transform:scale(1.012); }
 
 @media (max-width: 768px), (orientation: portrait) {
