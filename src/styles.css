@@ -124,7 +124,7 @@ button { color:inherit; cursor:pointer; }
 .bus-sound-toggle svg { width:14px; height:14px; fill:currentColor; flex-shrink:0; transition:transform .2s ease; }
 .bus-sound-toggle:hover svg { transform:scale(1.08); }
 .bus-sound-slider-wrap { flex:1; min-width:35px; display:flex; align-items:center; }
-.bus-sound-slider { appearance:none; -webkit-appearance:none; width:100%; height:3.5px; border-radius:99px; outline:none; background:linear-gradient(90deg,#f5c871 0%,#f5c871 var(--bus-volume,30%),rgba(255,255,255,.2) var(--bus-volume,30%),rgba(255,255,255,.2) 100%); cursor:pointer; }
+.bus-sound-slider { appearance:none; -webkit-appearance:none; width:100%; height:3.5px; border-radius:99px; outline:none; background:linear-gradient(90deg,#f5c871 0%,#f5c871 var(--bus-volume,25%),rgba(255,255,255,.2) var(--bus-volume,25%),rgba(255,255,255,.2) 100%); cursor:pointer; }
 .bus-sound-slider::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; width:11px; height:11px; border-radius:50%; background:#f5c871; box-shadow:0 0 6px rgba(245,200,113,.6); cursor:pointer; transition:transform .15s; }
 .bus-sound-slider::-webkit-slider-thumb:hover { transform:scale(1.25); }
 .bus-sound-slider::-moz-range-thumb { width:11px; height:11px; border-radius:50%; border:none; background:#f5c871; box-shadow:0 0 6px rgba(245,200,113,.6); cursor:pointer; }

@@ -42,7 +42,7 @@ There is nothing quite like a window-seat journey on a Kerala State Road Transpo
 - **Layered Rain Audio**: Dedicated ambient rain track that blends naturally with the music and engine.
 
 ### 🎚️ Multi-Track Audio Engine & Sound Controls
-- **Independent Engine Rumble**: Dedicated bus running sound (`runsound.mp3`) running at ~30% volume by default.
+- **Independent Engine Rumble**: Dedicated bus running sound (`runsound.mp3`) running at ~25% volume by default.
 - **Independent Rain Audio**: Dedicated rain audio layer (`rainsound.mp3`) enabled when Rain Mode is turned on.
 - **Individual Volume Sliders**: Custom sliders (0%–100%) and instant mute toggles for both the bus engine and rain sounds with persistent user preferences (`localStorage`).
 - **Synchronized Audio Pausing**: Ambient sounds smoothly react when music stops or when making a stop.

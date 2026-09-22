@@ -1,4 +1,4 @@
-import { journeyConfig, playlist } from './config.js?v=3';
+import { journeyConfig, playlist } from './config.js?v=4';
 
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -13,6 +13,7 @@ shuffle(playlist);
 
 const $ = (id) => document.getElementById(id);
 const state = { isJourneyStarted:false, isRainMode:false, isStopping:false, currentVideo:'journey', currentSongIndex:0, isPlaying:false, currentTime:0, duration:0, startTimer:null, unblurTimer:null };
+let userExplicitlyPaused = false;
 const app = $('app');
 const journey = $('journey-video'), rainVideo = $('rain-video'), stopVideo = $('stop-video'), scene = $('scene-video');
 const loadingBar = $('loading-bar'), loadingStatus = $('loading-status');
@@ -47,12 +48,12 @@ const savedRainVolume = (() => {
 let currentRainVolume = savedRainVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRainVolume, 10))) : Math.round((journeyConfig.volumes.rain ?? 0.8) * 100);
 let lastNonZeroRainVolume = currentRainVolume > 0 ? currentRainVolume : 80;
 
-// Bus running sound state & user volume preference
+// Bus running sound state & user volume preference (default: 25%)
 const savedRunVolume = (() => {
-  try { return localStorage.getItem('ksrtc_bus_sound_volume'); } catch (e) { return null; }
+  try { return localStorage.getItem('ksrtc_bus_sound_volume_v2'); } catch (e) { return null; }
 })();
-let currentRunVolume = savedRunVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRunVolume, 10))) : Math.round((journeyConfig.volumes.run ?? 0.3) * 100);
-let lastNonZeroRunVolume = currentRunVolume > 0 ? currentRunVolume : 30;
+let currentRunVolume = savedRunVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRunVolume, 10))) : Math.round((journeyConfig.volumes.run ?? 0.25) * 100);
+let lastNonZeroRunVolume = currentRunVolume > 0 ? currentRunVolume : 25;
 
 const rainAudio = new Audio(journeyConfig.sounds.rain);
 rainAudio.loop = true;
@@ -83,6 +84,22 @@ function preloadAudioAssets() {
     hornAudio.load();
     bellAudio.load();
     startAudio.load();
+
+    // Prime ambient audio on user gesture so mobile browsers allow async playback later
+    [runAudio, rainAudio].forEach((audio) => {
+      const origVol = audio.volume;
+      audio.volume = 0;
+      const p = audio.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = origVol;
+        }).catch(() => {
+          audio.volume = origVol;
+        });
+      }
+    });
   } catch (e) {}
 }
 
@@ -238,7 +255,7 @@ function initYTPlayer() {
           try {
             if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
             // Only play if the journey has actually started and finished the loading screen!
-            if (hasFinished && state.isPlaying) {
+            if (hasFinished && state.isPlaying && !userExplicitlyPaused) {
               if (ytPlayer.unMute) ytPlayer.unMute();
               if (ytPlayer.playVideo) ytPlayer.playVideo();
             }
@@ -252,6 +269,10 @@ function initYTPlayer() {
         },
         onStateChange: (event) => {
           if (event.data === YT.PlayerState.PLAYING) {
+            if (userExplicitlyPaused) {
+              try { ytPlayer.pauseVideo(); } catch (e) {}
+              return;
+            }
             state.isPlaying = true;
             els.play.classList.add('is-playing');
             els.play.setAttribute('aria-label', 'Pause');
@@ -326,7 +347,7 @@ function setBusSoundVolume(volume, savePref = true) {
   updateBusSoundUI(currentRunVolume);
   if (savePref) {
     try {
-      localStorage.setItem('ksrtc_bus_sound_volume', currentRunVolume);
+      localStorage.setItem('ksrtc_bus_sound_volume_v2', currentRunVolume);
     } catch (e) {}
   }
   syncRunAudio();
@@ -338,7 +359,7 @@ function toggleBusSound() {
     setBusSoundVolume(0);
     notify('Bus running sound muted.');
   } else {
-    const target = lastNonZeroRunVolume > 0 ? lastNonZeroRunVolume : 30;
+    const target = lastNonZeroRunVolume > 0 ? lastNonZeroRunVolume : 25;
     setBusSoundVolume(target);
     notify(`Bus running sound on (${target}%).`);
   }
@@ -385,6 +406,9 @@ function toggleRainSound() {
 }
 
 function setTrack(index, shouldPlay = true) {
+  if (shouldPlay) {
+    userExplicitlyPaused = false;
+  }
   state.currentSongIndex = (index + playlist.length) % playlist.length;
   const track = playlist[state.currentSongIndex];
   els.title.textContent = track.title;
@@ -428,6 +452,7 @@ function setTrack(index, shouldPlay = true) {
 }
 
 function playMusic() {
+  userExplicitlyPaused = false;
   state.isPlaying = true;
   els.play.classList.add('is-playing');
   els.play.setAttribute('aria-label', 'Pause');
@@ -451,6 +476,7 @@ function playMusic() {
 }
 
 function pauseMusic() {
+  userExplicitlyPaused = true;
   state.isPlaying = false;
   els.play.classList.remove('is-playing');
   els.play.setAttribute('aria-label', 'Play');
@@ -461,6 +487,9 @@ function pauseMusic() {
     } catch (e) {}
   }
   syncRunAudio();
+  if (!runAudio.paused) {
+    runAudio.pause();
+  }
 }
 function toggleRain() {
   if (state.isStopping) return;
@@ -495,8 +524,6 @@ function toggleRain() {
 
 let stopFallbackTimer = null;
 
-let wasMusicPlayingBeforeStop = false;
-
 function makeStop() {
   if (state.isStopping || !state.isJourneyStarted) return;
   if (state.isRainMode) {
@@ -505,6 +532,9 @@ function makeStop() {
   }
   state.isStopping = true;
   syncRunAudio();
+  if (!runAudio.paused) {
+    runAudio.pause();
+  }
   els.stop.disabled = true;
   els.stop.classList.add('is-stopping');
   const label = els.stop.querySelector('small');
@@ -527,11 +557,7 @@ function makeStop() {
   journey.classList.remove('is-visible');
   stopVideo.classList.add('is-visible');
 
-  // Pause music during the stop sequence so the bus stop audio is clearly heard
-  wasMusicPlayingBeforeStop = state.isPlaying;
-  if (wasMusicPlayingBeforeStop) {
-    pauseMusic();
-  }
+  // Music continues uninterrupted during the stop sequence
 
   const playPromise = playSafe(stopVideo);
   if (playPromise && typeof playPromise.catch === 'function') {
@@ -680,6 +706,8 @@ const finishLoading = () => {
   if (!state.isPlaying) {
     playMusic();
   }
+  syncRunAudio();
+  syncRainAudio();
 
   // When opened in Instagram browser only: pop in guidance message in song screen
   if (isInstagramOrInApp && !hasShownInstaModal) {
@@ -742,7 +770,6 @@ function resetJourney() {
   stopVideo.currentTime = 0;
   stopVideo.muted = true;
   stopVideo.classList.remove('is-visible');
-  wasMusicPlayingBeforeStop = false;
   rainVideo.pause();
   rainVideo.currentTime = 0;
   rainVideo.classList.remove('is-visible');
@@ -793,6 +820,12 @@ function resetJourney() {
   if (loadingStatus) {
     loadingStatus.textContent = 'Starting your ride in 8 seconds…';
   }
+  userExplicitlyPaused = false;
+  hasFirstTouchUnlocked = false;
+  cleanupUnlockListeners();
+  window.addEventListener('pointerdown', unlockAudioOnFirstTouch, { passive: true });
+  window.addEventListener('touchstart', unlockAudioOnFirstTouch, { passive: true });
+  window.addEventListener('click', unlockAudioOnFirstTouch, { passive: true });
 }
 
 // Track seek & progress polling from YouTube player
@@ -857,7 +890,8 @@ els.replay.addEventListener('click', () => {
   window.location.reload();
 });
 els.previous.addEventListener('click', () => setTrack(state.currentSongIndex - 1, true));
-els.play.addEventListener('click', () => {
+els.play.addEventListener('click', (e) => {
+  e.stopPropagation();
   if (state.isPlaying) {
     pauseMusic();
   } else {
@@ -912,10 +946,6 @@ function onStopEnded() {
     playSafe(journey);
     state.currentVideo = 'journey';
     syncRunAudio();
-    if (wasMusicPlayingBeforeStop) {
-      playMusic();
-      wasMusicPlayingBeforeStop = false;
-    }
     notify('Journey resumed.');
   }
 }
@@ -935,9 +965,28 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') setTrack(state.currentSongIndex - 1, true);
 });
 
+let hasFirstTouchUnlocked = false;
+
+function cleanupUnlockListeners() {
+  window.removeEventListener('pointerdown', unlockAudioOnFirstTouch);
+  window.removeEventListener('touchstart', unlockAudioOnFirstTouch);
+  window.removeEventListener('click', unlockAudioOnFirstTouch);
+}
+
 // Auto-unlock and unmute music on user interaction only AFTER the loading screen has finished
-const unlockAudioOnFirstTouch = () => {
-  if (!hasFinished || !state.isJourneyStarted) return;
+const unlockAudioOnFirstTouch = (e) => {
+  if (!hasFinished || !state.isJourneyStarted || hasFirstTouchUnlocked) return;
+
+  // If user interacted with controls directly, let that control manage playback
+  if (e && e.target && e.target.closest('button, input, a, .playlist-item')) {
+    hasFirstTouchUnlocked = true;
+    cleanupUnlockListeners();
+    return;
+  }
+
+  hasFirstTouchUnlocked = true;
+  cleanupUnlockListeners();
+
   if (ytPlayer && ytReady) {
     try {
       if (ytPlayer.isMuted && ytPlayer.isMuted()) {
@@ -948,8 +997,11 @@ const unlockAudioOnFirstTouch = () => {
       }
     } catch (e) {}
   }
-  if (!state.isPlaying && ytPlayer && ytReady) {
+  if (!userExplicitlyPaused && !state.isPlaying && ytPlayer && ytReady) {
     playMusic();
+  }
+  if (!userExplicitlyPaused && state.isPlaying && !state.isStopping && runAudio.paused) {
+    syncRunAudio();
   }
 };
 window.addEventListener('pointerdown', unlockAudioOnFirstTouch, { passive: true });

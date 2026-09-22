@@ -16,7 +16,7 @@ export const journeyConfig = {
     rain: './assets/audio/rainsound.mp3?v=2',
     run: './assets/audio/runsound.mp3'
   },
-  volumes: { music: 0.82, effects: 0.9, rain: 0.8, run: 0.3 },
+  volumes: { music: 0.82, effects: 0.9, rain: 0.8, run: 0.25 },
   youtubePlaylistId: 'PLdiCZyWeH7z9er98YNXIlDIZGZNtv0v2H'
 };
 
