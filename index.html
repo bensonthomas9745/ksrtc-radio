@@ -60,11 +60,10 @@
     <link rel="preload" as="image" href="./assets/images/ksrtc-logo.webp" type="image/webp" fetchpriority="high" />
     <link rel="preload" as="image" href="./assets/images/ksrtc-journey-fallback.webp" type="image/webp" fetchpriority="high" />
     <link rel="preload" as="audio" href="./assets/audio/startsound.mp3" />
-    <link rel="preload" as="audio" href="./assets/audio/runsound.mp3" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=27" />
+    <link rel="stylesheet" href="./src/styles.css?v=28" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -75,8 +74,8 @@
           <img class="fallback" src="./assets/images/ksrtc-journey-fallback.png" alt="KSRTC bus travelling through Kerala" fetchpriority="high" loading="eager" decoding="async" />
         </picture>
         <video id="journey-video" muted loop playsinline preload="auto" src="./assets/videos/Sunnyride.mp4"></video>
-        <video id="rain-video" muted loop playsinline preload="auto" src="./assets/videos/rain.mp4"></video>
-        <video id="stop-video" muted playsinline preload="auto" src="./assets/videos/gettingout.mp4"></video>
+        <video id="rain-video" muted loop playsinline preload="none" src="./assets/videos/rain.mp4"></video>
+        <video id="stop-video" muted playsinline preload="none" src="./assets/videos/gettingout.mp4"></video>
         <video id="scene-video" muted playsinline preload="none" hidden></video>
       </div>
       <div class="vignette" aria-hidden="true"></div>
@@ -327,6 +326,6 @@
       </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=27"></script>
+    <script type="module" src="./src/app.js?v=28"></script>
   </body>
 </html>

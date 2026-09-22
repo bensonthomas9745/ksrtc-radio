@@ -57,44 +57,53 @@ let lastNonZeroRunVolume = currentRunVolume > 0 ? currentRunVolume : 25;
 
 const rainAudio = new Audio(journeyConfig.sounds.rain);
 rainAudio.loop = true;
-rainAudio.preload = 'auto';
+rainAudio.preload = 'none';
 rainAudio.volume = currentRainVolume / 100;
 
 const runAudio = new Audio(journeyConfig.sounds.run);
 runAudio.loop = true;
-runAudio.preload = 'auto';
+runAudio.preload = 'none';
 runAudio.volume = currentRunVolume / 100;
 
 const hornAudio = new Audio(journeyConfig.sounds.horn);
-hornAudio.preload = 'auto';
+hornAudio.preload = 'none';
 hornAudio.volume = journeyConfig.volumes.effects;
 
 const bellAudio = new Audio(journeyConfig.sounds.busBell);
-bellAudio.preload = 'auto';
+bellAudio.preload = 'none';
 bellAudio.volume = journeyConfig.volumes.effects;
 
 const startAudio = new Audio(journeyConfig.sounds.journeyStart);
 startAudio.preload = 'auto';
 startAudio.volume = 1;
 
-// Immediate pre-buffering on site load for 0ms latency audio in production
+// Phase 1: On site load, ONLY pre-buffer the bus starting sound (journey video buffers via initJourneyVideo)
 function initAudioPreload() {
   try {
     startAudio.load();
-    runAudio.load();
-    hornAudio.load();
-    bellAudio.load();
   } catch (e) {}
 }
 initAudioPreload();
 
-function preloadAudioAssets() {
+// Phase 2: Simultaneous background loading of bus running sound, rain video, and stop video during the 8s loading bar
+let secondaryAssetsLoading = false;
+function loadSecondaryAssetsSimultaneously() {
+  if (secondaryAssetsLoading) return;
+  secondaryAssetsLoading = true;
+
+  // 1. Bus running sound and ambient audio loaded simultaneously
   try {
+    runAudio.preload = 'auto';
     runAudio.load();
+
+    rainAudio.preload = 'auto';
     rainAudio.load();
+
+    hornAudio.preload = 'auto';
     hornAudio.load();
+
+    bellAudio.preload = 'auto';
     bellAudio.load();
-    startAudio.load();
 
     // Prime ambient audio on user gesture so mobile browsers allow async playback later
     [runAudio, rainAudio].forEach((audio) => {
@@ -112,6 +121,29 @@ function preloadAudioAssets() {
       }
     });
   } catch (e) {}
+
+  // 2. Rain video and Make a stop video loaded simultaneously
+  try {
+    if (!rainVideo.src || rainVideo.src === window.location.href) {
+      rainVideo.src = journeyConfig.videos.rain;
+    }
+    rainVideo.loop = true;
+    rainVideo.preload = 'auto';
+    rainVideo.muted = true;
+    rainVideo.load();
+
+    if (!stopVideo.src || stopVideo.src === window.location.href) {
+      stopVideo.src = journeyConfig.videos.stop;
+    }
+    stopVideo.loop = false;
+    stopVideo.preload = 'auto';
+    stopVideo.muted = true;
+    stopVideo.load();
+  } catch (e) {}
+}
+
+function preloadAudioAssets() {
+  loadSecondaryAssetsSimultaneously();
 }
 
 function playSoundEffect(audioObj) {
@@ -218,28 +250,14 @@ function initJourneyVideo() {
 }
 
 function initSecondaryVideos() {
-  if (!rainVideo.src || rainVideo.src === window.location.href) {
-    rainVideo.src = journeyConfig.videos.rain;
-  }
-  rainVideo.loop = true;
-  rainVideo.preload = 'auto';
-  rainVideo.muted = true;
-  rainVideo.load();
-
-  if (!stopVideo.src || stopVideo.src === window.location.href) {
-    stopVideo.src = journeyConfig.videos.stop;
-  }
-  stopVideo.loop = false;
-  stopVideo.preload = 'auto';
-  stopVideo.muted = true;
-  stopVideo.load();
+  loadSecondaryAssetsSimultaneously();
 }
 
-// Immediately initialize primary journey video
+// Immediately initialize primary journey video (Phase 1 on site load)
 initJourneyVideo();
 
 function preloadSecondaryVideos() {
-  initSecondaryVideos();
+  loadSecondaryAssetsSimultaneously();
 }
 
 let ytPlayer = null;
@@ -687,11 +705,12 @@ function startJourney(e) {
   if (els.start) els.start.disabled = true;
   els.intro.classList.add('is-starting');
 
-  // Preload all audio assets on this user gesture so they are ready when loading finishes
-  preloadAudioAssets();
-
+  // Play bus starting sound immediately (buffered since site load)
   currentStartupSound = startAudio;
   playSoundEffect(startAudio);
+
+  // SIMULTANEOUSLY start loading bus running sound, rain video, and make a stop video during the 8s loading bar!
+  loadSecondaryAssetsSimultaneously();
 
   const STARTUP_DURATION_MS = 8000;
   let animId = null;
