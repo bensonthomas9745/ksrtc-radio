@@ -291,6 +291,8 @@
 
       /* Container */
       .page-shell {
+        position: relative;
+        z-index: 1;
         max-width: var(--max-width);
         margin: 0 auto;
         padding: 50px 24px 120px;
@@ -305,30 +307,30 @@
         align-items: center;
       }
 
-      /* Heavily Blurred Background Atmosphere */
-      .bg-blur-container {
+      /* Atmospheric Background Photo */
+      .bg-photo-container {
         position: fixed;
-        inset: -50px;
-        z-index: -1;
+        inset: -20px;
+        z-index: 0;
         overflow: hidden;
         pointer-events: none;
       }
 
-      .bg-blur-image {
+      .bg-photo-image {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        object-position: center 35%;
-        filter: blur(80px) saturate(1.45) brightness(0.25);
-        transform: scale(1.2);
+        object-position: center 30%;
+        filter: blur(14px) saturate(1.25) brightness(0.44);
+        transform: scale(1.06);
         will-change: transform;
       }
 
-      .bg-blur-overlay {
+      .bg-photo-overlay {
         position: absolute;
         inset: 0;
-        background: radial-gradient(ellipse at 50% 15%, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.88) 85%),
-                    linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.95) 100%);
+        background: radial-gradient(ellipse at 50% 18%, rgba(8, 8, 10, 0.42) 0%, rgba(5, 5, 7, 0.85) 75%),
+                    linear-gradient(180deg, rgba(5, 5, 7, 0.45) 0%, rgba(5, 5, 7, 0.92) 100%);
       }
 
       .hero h1 {
@@ -705,6 +707,33 @@
         margin-bottom: 8px;
       }
 
+      .creator-signature {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 18px 0 16px;
+        padding: 7px 18px;
+        border-radius: 980px;
+        background: rgba(229, 179, 88, 0.08);
+        border: 0.5px solid rgba(229, 179, 88, 0.28);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      }
+
+      .creator-label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      .creator-name {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--accent-gold);
+        letter-spacing: 0.02em;
+      }
+
       /* Responsive rules */
       @media (max-width: 860px) {
         .bento-span-7,
@@ -743,10 +772,13 @@
     </style>
   </head>
   <body>
-    <!-- Heavily Blurred Ambient Background Image -->
-    <div class="bg-blur-container" aria-hidden="true">
-      <img class="bg-blur-image" src="./assets/images/ksrtc-journey-fallback.webp" alt="" />
-      <div class="bg-blur-overlay"></div>
+    <!-- Atmospheric Background Photo -->
+    <div class="bg-photo-container" aria-hidden="true">
+      <picture>
+        <source srcset="/assets/images/ksrtc-journey-fallback.webp" type="image/webp" />
+        <img class="bg-photo-image" src="/assets/images/ksrtc-journey-fallback.png" alt="" />
+      </picture>
+      <div class="bg-photo-overlay"></div>
     </div>
 
     <!-- Apple-Style Translucent Navigation Header -->
@@ -991,6 +1023,10 @@
           <a href="/about">About</a>
           <a href="https://github.com/bensonthomas9745/ksrtc-radio" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
+        <div class="creator-signature">
+          <span class="creator-label">Created by</span>
+          <span class="creator-name">Benson Thomas</span>
+        </div>
         <p class="footer-copy">
           KSRTC Radio (ആനവണ്ടി) is an independent digital project created by Benson Thomas as a cultural fan tribute. It is not affiliated with, endorsed by, or operated by Kerala State Road Transport Corporation. All trademarks, music compositions, and audio recordings belong to their respective copyright owners.
         </p>
