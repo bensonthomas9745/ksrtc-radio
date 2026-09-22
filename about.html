@@ -41,8 +41,9 @@
     />
     <meta name="twitter:image" content="https://ksrtcradio.online/assets/images/ksrtc-journey-fallback.png" />
 
-    <!-- Favicon -->
+    <!-- Favicon & Preloads -->
     <link rel="icon" type="image/png" href="./src/favicon.png" />
+    <link rel="preload" as="image" href="./assets/images/ksrtc-logo.webp" type="image/webp" />
 
     <!-- Structured Data (JSON-LD) for Search Engines -->
     <script type="application/ld+json">
@@ -719,7 +720,10 @@
       <div class="nav-container">
         <a href="/" class="brand" title="Return to KSRTC Radio">
           <div class="brand-icon">
-            <img src="./assets/images/ksrtc-logo.png" alt="KSRTC seal" width="28" height="28" />
+            <picture>
+              <source srcset="./assets/images/ksrtc-logo.webp" type="image/webp" />
+              <img src="./assets/images/ksrtc-logo.png" alt="KSRTC seal" width="28" height="28" loading="eager" decoding="async" />
+            </picture>
           </div>
           <span class="brand-title">KSRTC Radio</span>
           <span class="brand-subtitle">ആനവണ്ടി</span>

@@ -1,4 +1,4 @@
-import { journeyConfig, playlist } from './config.js?v=4';
+import { journeyConfig, playlist } from './config.js?v=5';
 
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -77,6 +77,42 @@ const startAudio = new Audio(journeyConfig.sounds.journeyStart);
 startAudio.preload = 'auto';
 startAudio.volume = 1;
 
+// Immediate pre-buffering on site load for 0ms latency audio in production
+function initAudioPreload() {
+  try {
+    startAudio.load();
+    runAudio.load();
+    hornAudio.load();
+    bellAudio.load();
+  } catch (e) {}
+
+  // Fetch critical audio as Blobs so audio plays instantly from device RAM without network roundtrips
+  if (typeof fetch === 'function') {
+    fetch(journeyConfig.sounds.journeyStart)
+      .then(res => (res.ok ? res.blob() : null))
+      .then(blob => {
+        if (blob && !state.isJourneyStarted) {
+          const blobUrl = URL.createObjectURL(blob);
+          startAudio.src = blobUrl;
+          startAudio.load();
+        }
+      })
+      .catch(() => {});
+
+    fetch(journeyConfig.sounds.run)
+      .then(res => (res.ok ? res.blob() : null))
+      .then(blob => {
+        if (blob && !state.isJourneyStarted) {
+          const blobUrl = URL.createObjectURL(blob);
+          runAudio.src = blobUrl;
+          runAudio.load();
+        }
+      })
+      .catch(() => {});
+  }
+}
+initAudioPreload();
+
 function preloadAudioAssets() {
   try {
     runAudio.load();
@@ -106,7 +142,9 @@ function preloadAudioAssets() {
 function playSoundEffect(audioObj) {
   if (!audioObj) return;
   try {
-    audioObj.currentTime = 0;
+    if (audioObj.readyState >= 1) {
+      audioObj.currentTime = 0;
+    }
     const p = audioObj.play();
     if (p && typeof p.catch === 'function') {
       p.catch(() => {});
