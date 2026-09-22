@@ -13,7 +13,6 @@ shuffle(playlist);
 
 const $ = (id) => document.getElementById(id);
 const state = { isJourneyStarted:false, isRainMode:false, isStopping:false, currentVideo:'journey', currentSongIndex:0, isPlaying:false, currentTime:0, duration:0, startTimer:null, unblurTimer:null };
-let userExplicitlyPaused = false;
 const app = $('app');
 const journey = $('journey-video'), rainVideo = $('rain-video'), stopVideo = $('stop-video'), scene = $('scene-video');
 const loadingBar = $('loading-bar'), loadingStatus = $('loading-status');
@@ -48,110 +47,49 @@ const savedRainVolume = (() => {
 let currentRainVolume = savedRainVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRainVolume, 10))) : Math.round((journeyConfig.volumes.rain ?? 0.8) * 100);
 let lastNonZeroRainVolume = currentRainVolume > 0 ? currentRainVolume : 80;
 
-// Bus running sound state & user volume preference (default: 25%)
+// Bus running sound state & user volume preference
 const savedRunVolume = (() => {
-  try { return localStorage.getItem('ksrtc_bus_sound_volume_v2'); } catch (e) { return null; }
+  try { return localStorage.getItem('ksrtc_bus_sound_volume_v2') ?? localStorage.getItem('ksrtc_bus_sound_volume'); } catch (e) { return null; }
 })();
 let currentRunVolume = savedRunVolume !== null ? Math.max(0, Math.min(100, parseInt(savedRunVolume, 10))) : Math.round((journeyConfig.volumes.run ?? 0.25) * 100);
 let lastNonZeroRunVolume = currentRunVolume > 0 ? currentRunVolume : 25;
 
 const rainAudio = new Audio(journeyConfig.sounds.rain);
 rainAudio.loop = true;
-rainAudio.preload = 'none';
+rainAudio.preload = 'auto';
 rainAudio.volume = currentRainVolume / 100;
 
 const runAudio = new Audio(journeyConfig.sounds.run);
 runAudio.loop = true;
-runAudio.preload = 'none';
+runAudio.preload = 'auto';
 runAudio.volume = currentRunVolume / 100;
 
 const hornAudio = new Audio(journeyConfig.sounds.horn);
-hornAudio.preload = 'none';
+hornAudio.preload = 'auto';
 hornAudio.volume = journeyConfig.volumes.effects;
 
 const bellAudio = new Audio(journeyConfig.sounds.busBell);
-bellAudio.preload = 'none';
+bellAudio.preload = 'auto';
 bellAudio.volume = journeyConfig.volumes.effects;
 
 const startAudio = new Audio(journeyConfig.sounds.journeyStart);
 startAudio.preload = 'auto';
 startAudio.volume = 1;
 
-// Phase 1: On site load, ONLY pre-buffer the bus starting sound (journey video buffers via initJourneyVideo)
-function initAudioPreload() {
+function preloadAudioAssets() {
   try {
+    runAudio.load();
+    rainAudio.load();
+    hornAudio.load();
+    bellAudio.load();
     startAudio.load();
   } catch (e) {}
-}
-initAudioPreload();
-
-// Phase 2: Simultaneous background loading of bus running sound, rain video, and stop video during the 8s loading bar
-let secondaryAssetsLoading = false;
-function loadSecondaryAssetsSimultaneously() {
-  if (secondaryAssetsLoading) return;
-  secondaryAssetsLoading = true;
-
-  // 1. Bus running sound and ambient audio loaded simultaneously
-  try {
-    runAudio.preload = 'auto';
-    runAudio.load();
-
-    rainAudio.preload = 'auto';
-    rainAudio.load();
-
-    hornAudio.preload = 'auto';
-    hornAudio.load();
-
-    bellAudio.preload = 'auto';
-    bellAudio.load();
-
-    // Prime ambient audio on user gesture so mobile browsers allow async playback later
-    [runAudio, rainAudio].forEach((audio) => {
-      const origVol = audio.volume;
-      audio.volume = 0;
-      const p = audio.play();
-      if (p && typeof p.then === 'function') {
-        p.then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          audio.volume = origVol;
-        }).catch(() => {
-          audio.volume = origVol;
-        });
-      }
-    });
-  } catch (e) {}
-
-  // 2. Rain video and Make a stop video loaded simultaneously
-  try {
-    if (!rainVideo.src || rainVideo.src === window.location.href) {
-      rainVideo.src = journeyConfig.videos.rain;
-    }
-    rainVideo.loop = true;
-    rainVideo.preload = 'auto';
-    rainVideo.muted = true;
-    rainVideo.load();
-
-    if (!stopVideo.src || stopVideo.src === window.location.href) {
-      stopVideo.src = journeyConfig.videos.stop;
-    }
-    stopVideo.loop = false;
-    stopVideo.preload = 'auto';
-    stopVideo.muted = true;
-    stopVideo.load();
-  } catch (e) {}
-}
-
-function preloadAudioAssets() {
-  loadSecondaryAssetsSimultaneously();
 }
 
 function playSoundEffect(audioObj) {
   if (!audioObj) return;
   try {
-    if (audioObj.readyState >= 1) {
-      audioObj.currentTime = 0;
-    }
+    audioObj.currentTime = 0;
     const p = audioObj.play();
     if (p && typeof p.catch === 'function') {
       p.catch(() => {});
@@ -250,14 +188,26 @@ function initJourneyVideo() {
 }
 
 function initSecondaryVideos() {
-  loadSecondaryAssetsSimultaneously();
+  if (!rainVideo.src || rainVideo.src === window.location.href) {
+    rainVideo.src = journeyConfig.videos.rain;
+  }
+  rainVideo.loop = true;
+  rainVideo.preload = 'auto';
+  rainVideo.load();
+
+  if (!stopVideo.src || stopVideo.src === window.location.href) {
+    stopVideo.src = journeyConfig.videos.stop;
+  }
+  stopVideo.loop = false;
+  stopVideo.preload = 'auto';
+  stopVideo.load();
 }
 
-// Immediately initialize primary journey video (Phase 1 on site load)
+// Immediately initialize primary journey video
 initJourneyVideo();
 
 function preloadSecondaryVideos() {
-  loadSecondaryAssetsSimultaneously();
+  initSecondaryVideos();
 }
 
 let ytPlayer = null;
@@ -288,7 +238,7 @@ function initYTPlayer() {
           try {
             if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
             // Only play if the journey has actually started and finished the loading screen!
-            if (hasFinished && state.isPlaying && !userExplicitlyPaused) {
+            if (hasFinished && state.isPlaying) {
               if (ytPlayer.unMute) ytPlayer.unMute();
               if (ytPlayer.playVideo) ytPlayer.playVideo();
             }
@@ -302,10 +252,6 @@ function initYTPlayer() {
         },
         onStateChange: (event) => {
           if (event.data === YT.PlayerState.PLAYING) {
-            if (userExplicitlyPaused) {
-              try { ytPlayer.pauseVideo(); } catch (e) {}
-              return;
-            }
             state.isPlaying = true;
             els.play.classList.add('is-playing');
             els.play.setAttribute('aria-label', 'Pause');
@@ -380,7 +326,7 @@ function setBusSoundVolume(volume, savePref = true) {
   updateBusSoundUI(currentRunVolume);
   if (savePref) {
     try {
-      localStorage.setItem('ksrtc_bus_sound_volume_v2', currentRunVolume);
+      localStorage.setItem('ksrtc_bus_sound_volume', currentRunVolume);
     } catch (e) {}
   }
   syncRunAudio();
@@ -439,9 +385,6 @@ function toggleRainSound() {
 }
 
 function setTrack(index, shouldPlay = true) {
-  if (shouldPlay) {
-    userExplicitlyPaused = false;
-  }
   state.currentSongIndex = (index + playlist.length) % playlist.length;
   const track = playlist[state.currentSongIndex];
   els.title.textContent = track.title;
@@ -485,7 +428,6 @@ function setTrack(index, shouldPlay = true) {
 }
 
 function playMusic() {
-  userExplicitlyPaused = false;
   state.isPlaying = true;
   els.play.classList.add('is-playing');
   els.play.setAttribute('aria-label', 'Pause');
@@ -509,7 +451,6 @@ function playMusic() {
 }
 
 function pauseMusic() {
-  userExplicitlyPaused = true;
   state.isPlaying = false;
   els.play.classList.remove('is-playing');
   els.play.setAttribute('aria-label', 'Play');
@@ -520,124 +461,33 @@ function pauseMusic() {
     } catch (e) {}
   }
   syncRunAudio();
-  if (!runAudio.paused) {
-    runAudio.pause();
-  }
 }
-function switchSceneVideo(targetVideo, currentVideo, onComplete) {
-  if (!targetVideo) return;
-  if (targetVideo === currentVideo) {
-    targetVideo.classList.add('is-visible');
-    try { targetVideo.play().catch(() => {}); } catch (e) {}
-    if (onComplete) onComplete();
-    return;
-  }
-
-  // Always keep target video muted so browser autoplay policies NEVER block playback
-  targetVideo.muted = true;
-
-  // Bring targetVideo to top layer while keeping it transparent (opacity: 0)
-  [journey, rainVideo, stopVideo].forEach((v) => {
-    if (v && v !== targetVideo) {
-      v.classList.remove('is-top');
-    }
-  });
-  targetVideo.classList.add('is-top');
-
-  // CRITICAL: Ensure currentVideo stays visible and playing underneath while target is buffering
-  if (currentVideo) {
-    currentVideo.classList.add('is-visible');
-    try { currentVideo.play().catch(() => {}); } catch (e) {}
-  }
-
-  // Start playback of targetVideo
-  try {
-    targetVideo.play().catch((err) => {
-      console.warn('Video play error:', err);
-    });
-  } catch (e) {}
-
-  let crossFadeDone = false;
-  const executeCrossFade = () => {
-    if (crossFadeDone) return;
-    crossFadeDone = true;
-
-    // Fade targetVideo in smoothly over currentVideo
-    targetVideo.classList.add('is-visible');
-
-    // Wait for the CSS opacity transition (350ms) to complete
-    setTimeout(() => {
-      // Outgoing video is now completely covered by targetVideo
-      if (currentVideo && currentVideo !== targetVideo) {
-        currentVideo.classList.remove('is-visible', 'is-top');
-        try { currentVideo.pause(); } catch (e) {}
-      }
-      targetVideo.classList.remove('is-top');
-      if (onComplete) onComplete();
-    }, 380);
-  };
-
-  // If target video is ALREADY rendering frames and actively playing
-  if (targetVideo.readyState >= 3 && !targetVideo.paused && targetVideo.currentTime > 0) {
-    executeCrossFade();
-    return;
-  }
-
-  // Wait until targetVideo ACTUALLY produces a frame before fading it in or pausing currentVideo!
-  let cleanupListeners = null;
-  const onReadyToDisplay = () => {
-    if (cleanupListeners) cleanupListeners();
-    executeCrossFade();
-  };
-
-  if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
-    try {
-      targetVideo.requestVideoFrameCallback(() => {
-        onReadyToDisplay();
-      });
-    } catch (e) {}
-  }
-
-  const onPlaying = () => onReadyToDisplay();
-  const onTimeUpdate = () => {
-    if (targetVideo.currentTime > 0) onReadyToDisplay();
-  };
-
-  targetVideo.addEventListener('playing', onPlaying, { once: true });
-  targetVideo.addEventListener('timeupdate', onTimeUpdate, { once: true });
-
-  cleanupListeners = () => {
-    targetVideo.removeEventListener('playing', onPlaying);
-    targetVideo.removeEventListener('timeupdate', onTimeUpdate);
-  };
-
-  // Safety fallback: if video takes more than 1.2s to buffer, execute crossfade so it never hangs
-  setTimeout(onReadyToDisplay, 1200);
-}
-
-let isTogglingRain = false;
 function toggleRain() {
-  if (state.isStopping || isTogglingRain) return;
-  isTogglingRain = true;
-  setTimeout(() => { isTogglingRain = false; }, 500);
-
+  if (state.isStopping) return;
   state.isRainMode = !state.isRainMode;
   els.rain.classList.toggle('active', state.isRainMode);
   els.rain.querySelector('small').textContent = state.isRainMode ? 'Rain On' : 'Rain Off';
   els.rain.setAttribute('aria-label', state.isRainMode ? 'Turn rain off' : 'Turn rain on');
   updateRainBarState(state.isRainMode);
-
   if (state.isRainMode) {
+    journey.pause();
+    journey.classList.remove('is-visible');
+    rainVideo.currentTime = 0;
+    rainVideo.classList.add('is-visible');
+    playSafe(rainVideo);
     state.currentVideo = 'rain';
-    switchSceneVideo(rainVideo, journey);
     rainAudio.volume = currentRainVolume / 100;
+    rainAudio.currentTime = 0;
     syncRainAudio();
     notify('Rain on.');
   } else {
-    state.currentVideo = 'journey';
-    switchSceneVideo(journey, rainVideo);
     rainAudio.pause();
     rainAudio.currentTime = 0;
+    rainVideo.pause();
+    rainVideo.classList.remove('is-visible');
+    journey.classList.add('is-visible');
+    playSafe(journey);
+    state.currentVideo = 'journey';
     notify('Rain off.');
   }
   syncRunAudio();
@@ -645,17 +495,16 @@ function toggleRain() {
 
 let stopFallbackTimer = null;
 
+let wasMusicPlayingBeforeStop = false;
+
 function makeStop() {
-  if (state.isStopping || !state.isJourneyStarted || isTogglingRain) return;
+  if (state.isStopping || !state.isJourneyStarted) return;
   if (state.isRainMode) {
     notify('Please turn off rain mode to make a stop.');
     return;
   }
   state.isStopping = true;
   syncRunAudio();
-  if (!runAudio.paused) {
-    runAudio.pause();
-  }
   els.stop.disabled = true;
   els.stop.classList.add('is-stopping');
   const label = els.stop.querySelector('small');
@@ -666,19 +515,42 @@ function makeStop() {
     stopVideo.src = journeyConfig.videos.stop;
   }
 
-  // Ensure stopVideo is muted so browser autoplay policies never block playback
-  stopVideo.muted = true;
+  // Enable audio for stop video and set realistic volume
+  stopVideo.muted = false;
+  stopVideo.volume = journeyConfig.volumes.effects ?? 0.9;
 
   try {
-    if (stopVideo.currentTime !== 0) {
-      stopVideo.currentTime = 0;
-    }
+    stopVideo.currentTime = 0;
   } catch (e) {}
+
+  journey.pause();
+  journey.classList.remove('is-visible');
+  stopVideo.classList.add('is-visible');
+
+  // Pause music during the stop sequence so the bus stop audio is clearly heard
+  wasMusicPlayingBeforeStop = state.isPlaying;
+  if (wasMusicPlayingBeforeStop) {
+    pauseMusic();
+  }
+
+  try {
+    const playPromise = stopVideo.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {
+        // Fallback: if browser blocks unmuted playback, play muted
+        stopVideo.muted = true;
+        stopVideo.play().catch(() => {});
+      });
+    }
+  } catch (e) {
+    stopVideo.muted = true;
+    stopVideo.play().catch(() => {});
+  }
 
   state.currentVideo = 'stop';
   notify('Stopping at the next stop…');
 
-  // Watchdog timer: guarantees journey resumes even if device stalls or drops video playback
+  // Watchdog timer: guarantees journey resumes even if device freezes, stalls, or drops video playback
   clearTimeout(stopFallbackTimer);
   const dur = (Number.isFinite(stopVideo.duration) && stopVideo.duration > 0)
     ? stopVideo.duration
@@ -690,27 +562,23 @@ function makeStop() {
       onStopEnded();
     }
   }, timeoutMs);
-
-  switchSceneVideo(stopVideo, journey);
 }
 
 let currentStartupSound = null;
 
-function startJourney(e) {
-  if (e && e.preventDefault && e.cancelable) e.preventDefault();
+function startJourney() {
   if (state.isJourneyStarted) return;
   state.isJourneyStarted = true;
   hasFinished = false;
   hasTriggeredEarlySong = false;
-  if (els.start) els.start.disabled = true;
+  els.start.disabled = true;
   els.intro.classList.add('is-starting');
 
-  // Play bus starting sound immediately (buffered since site load)
+  // Preload all audio assets on this user gesture so they are ready when loading finishes
+  preloadAudioAssets();
+
   currentStartupSound = startAudio;
   playSoundEffect(startAudio);
-
-  // SIMULTANEOUSLY start loading bus running sound, rain video, and make a stop video during the 8s loading bar!
-  loadSecondaryAssetsSimultaneously();
 
   const STARTUP_DURATION_MS = 8000;
   let animId = null;
@@ -813,8 +681,6 @@ const finishLoading = () => {
   if (!state.isPlaying) {
     playMusic();
   }
-  syncRunAudio();
-  syncRainAudio();
 
   // When opened in Instagram browser only: pop in guidance message in song screen
   if (isInstagramOrInApp && !hasShownInstaModal) {
@@ -876,13 +742,14 @@ function resetJourney() {
   stopVideo.pause();
   stopVideo.currentTime = 0;
   stopVideo.muted = true;
-  stopVideo.classList.remove('is-visible', 'is-top');
+  stopVideo.classList.remove('is-visible');
+  wasMusicPlayingBeforeStop = false;
   rainVideo.pause();
   rainVideo.currentTime = 0;
-  rainVideo.classList.remove('is-visible', 'is-top');
+  rainVideo.classList.remove('is-visible');
   journey.pause();
   journey.currentTime = 0;
-  journey.classList.remove('is-visible', 'is-top');
+  journey.classList.remove('is-visible');
   Object.assign(state, {
     isJourneyStarted: false,
     isRainMode: false,
@@ -927,12 +794,6 @@ function resetJourney() {
   if (loadingStatus) {
     loadingStatus.textContent = 'Starting your ride in 8 seconds…';
   }
-  userExplicitlyPaused = false;
-  hasFirstTouchUnlocked = false;
-  cleanupUnlockListeners();
-  window.addEventListener('pointerdown', unlockAudioOnFirstTouch, { passive: true });
-  window.addEventListener('touchstart', unlockAudioOnFirstTouch, { passive: true });
-  window.addEventListener('click', unlockAudioOnFirstTouch, { passive: true });
 }
 
 // Track seek & progress polling from YouTube player
@@ -983,24 +844,7 @@ function triggerBell() {
   bellTimer = setTimeout(() => els.bell.classList.remove('is-pressed'), 1200);
 }
 
-window.__startJourney = startJourney;
-if (window.__startPending) {
-  window.__startPending = false;
-  startJourney();
-}
-
-if (els.start) {
-  const triggerStart = (e) => {
-    if (e && e.cancelable && e.type === 'touchstart') e.preventDefault();
-    startJourney(e);
-  };
-  els.start.addEventListener('click', triggerStart);
-  els.start.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-      triggerStart(e);
-    }
-  });
-}
+els.start.addEventListener('click', startJourney);
 if (els.boardNow) {
   els.boardNow.addEventListener('click', () => {
     if (!hasFinished && state.isJourneyStarted) {
@@ -1014,8 +858,7 @@ els.replay.addEventListener('click', () => {
   window.location.reload();
 });
 els.previous.addEventListener('click', () => setTrack(state.currentSongIndex - 1, true));
-els.play.addEventListener('click', (e) => {
-  e.stopPropagation();
+els.play.addEventListener('click', () => {
   if (state.isPlaying) {
     pauseMusic();
   } else {
@@ -1061,17 +904,19 @@ function onStopEnded() {
     els.stop.classList.remove('is-stopping');
     const stopLabel = els.stop.querySelector('small');
     if (stopLabel) stopLabel.textContent = 'Make a Stop';
-
+    try {
+      stopVideo.pause();
+      stopVideo.muted = true;
+    } catch (e) {}
+    stopVideo.classList.remove('is-visible');
+    journey.classList.add('is-visible');
+    playSafe(journey);
     state.currentVideo = 'journey';
-    switchSceneVideo(journey, stopVideo, () => {
-      try {
-        stopVideo.pause();
-        stopVideo.muted = true;
-        stopVideo.currentTime = 0;
-      } catch (e) {}
-    });
-
     syncRunAudio();
+    if (wasMusicPlayingBeforeStop) {
+      playMusic();
+      wasMusicPlayingBeforeStop = false;
+    }
     notify('Journey resumed.');
   }
 }
@@ -1091,28 +936,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') setTrack(state.currentSongIndex - 1, true);
 });
 
-let hasFirstTouchUnlocked = false;
-
-function cleanupUnlockListeners() {
-  window.removeEventListener('pointerdown', unlockAudioOnFirstTouch);
-  window.removeEventListener('touchstart', unlockAudioOnFirstTouch);
-  window.removeEventListener('click', unlockAudioOnFirstTouch);
-}
-
 // Auto-unlock and unmute music on user interaction only AFTER the loading screen has finished
-const unlockAudioOnFirstTouch = (e) => {
-  if (!hasFinished || !state.isJourneyStarted || hasFirstTouchUnlocked) return;
-
-  // If user interacted with controls directly, let that control manage playback
-  if (e && e.target && e.target.closest('button, input, a, .playlist-item')) {
-    hasFirstTouchUnlocked = true;
-    cleanupUnlockListeners();
-    return;
-  }
-
-  hasFirstTouchUnlocked = true;
-  cleanupUnlockListeners();
-
+const unlockAudioOnFirstTouch = () => {
+  if (!hasFinished || !state.isJourneyStarted) return;
   if (ytPlayer && ytReady) {
     try {
       if (ytPlayer.isMuted && ytPlayer.isMuted()) {
@@ -1123,11 +949,8 @@ const unlockAudioOnFirstTouch = (e) => {
       }
     } catch (e) {}
   }
-  if (!userExplicitlyPaused && !state.isPlaying && ytPlayer && ytReady) {
+  if (!state.isPlaying && ytPlayer && ytReady) {
     playMusic();
-  }
-  if (!userExplicitlyPaused && state.isPlaying && !state.isStopping && runAudio.paused) {
-    syncRunAudio();
   }
 };
 window.addEventListener('pointerdown', unlockAudioOnFirstTouch, { passive: true });
