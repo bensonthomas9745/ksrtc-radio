@@ -85,31 +85,6 @@ function initAudioPreload() {
     hornAudio.load();
     bellAudio.load();
   } catch (e) {}
-
-  // Fetch critical audio as Blobs so audio plays instantly from device RAM without network roundtrips
-  if (typeof fetch === 'function') {
-    fetch(journeyConfig.sounds.journeyStart)
-      .then(res => (res.ok ? res.blob() : null))
-      .then(blob => {
-        if (blob && !state.isJourneyStarted) {
-          const blobUrl = URL.createObjectURL(blob);
-          startAudio.src = blobUrl;
-          startAudio.load();
-        }
-      })
-      .catch(() => {});
-
-    fetch(journeyConfig.sounds.run)
-      .then(res => (res.ok ? res.blob() : null))
-      .then(blob => {
-        if (blob && !state.isJourneyStarted) {
-          const blobUrl = URL.createObjectURL(blob);
-          runAudio.src = blobUrl;
-          runAudio.load();
-        }
-      })
-      .catch(() => {});
-  }
 }
 initAudioPreload();
 
@@ -260,9 +235,8 @@ function initSecondaryVideos() {
   stopVideo.load();
 }
 
-// Immediately initialize primary and secondary scene videos
+// Immediately initialize primary journey video
 initJourneyVideo();
-initSecondaryVideos();
 
 function preloadSecondaryVideos() {
   initSecondaryVideos();
@@ -695,12 +669,13 @@ function makeStop() {
 
 let currentStartupSound = null;
 
-function startJourney() {
+function startJourney(e) {
+  if (e && e.preventDefault && e.cancelable) e.preventDefault();
   if (state.isJourneyStarted) return;
   state.isJourneyStarted = true;
   hasFinished = false;
   hasTriggeredEarlySong = false;
-  els.start.disabled = true;
+  if (els.start) els.start.disabled = true;
   els.intro.classList.add('is-starting');
 
   // Preload all audio assets on this user gesture so they are ready when loading finishes
@@ -980,7 +955,24 @@ function triggerBell() {
   bellTimer = setTimeout(() => els.bell.classList.remove('is-pressed'), 1200);
 }
 
-els.start.addEventListener('click', startJourney);
+window.__startJourney = startJourney;
+if (window.__startPending) {
+  window.__startPending = false;
+  startJourney();
+}
+
+if (els.start) {
+  const triggerStart = (e) => {
+    if (e && e.cancelable && e.type === 'touchstart') e.preventDefault();
+    startJourney(e);
+  };
+  els.start.addEventListener('click', triggerStart);
+  els.start.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      triggerStart(e);
+    }
+  });
+}
 if (els.boardNow) {
   els.boardNow.addEventListener('click', () => {
     if (!hasFinished && state.isJourneyStarted) {
