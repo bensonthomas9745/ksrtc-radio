@@ -506,30 +506,19 @@ function pauseMusic() {
     runAudio.pause();
   }
 }
-function playVideoSafe(video) {
-  if (!video) return null;
-  const p = playSafe(video);
-  if (p && typeof p.catch === 'function') {
-    p.catch(() => {
-      if (video.muted === false) {
-        video.muted = true;
-        playSafe(video);
-      }
-    });
-  }
-  return p;
-}
-
 function switchSceneVideo(targetVideo, currentVideo, onComplete) {
   if (!targetVideo) return;
   if (targetVideo === currentVideo) {
     targetVideo.classList.add('is-visible');
-    playVideoSafe(targetVideo);
+    try { targetVideo.play().catch(() => {}); } catch (e) {}
     if (onComplete) onComplete();
     return;
   }
 
-  // Ensure targetVideo is cleanly on top layer during crossfade
+  // Always keep target video muted so browser autoplay policies NEVER block playback
+  targetVideo.muted = true;
+
+  // Bring targetVideo to top layer while keeping it transparent (opacity: 0)
   [journey, rainVideo, stopVideo].forEach((v) => {
     if (v && v !== targetVideo) {
       v.classList.remove('is-top');
@@ -537,55 +526,75 @@ function switchSceneVideo(targetVideo, currentVideo, onComplete) {
   });
   targetVideo.classList.add('is-top');
 
-  // Start playing targetVideo before fading it in
-  playVideoSafe(targetVideo);
+  // CRITICAL: Ensure currentVideo stays visible and playing underneath while target is buffering
+  if (currentVideo) {
+    currentVideo.classList.add('is-visible');
+    try { currentVideo.play().catch(() => {}); } catch (e) {}
+  }
 
-  let crossFadeTriggered = false;
-  const triggerCrossFade = () => {
-    if (crossFadeTriggered) return;
-    crossFadeTriggered = true;
+  // Start playback of targetVideo
+  try {
+    targetVideo.play().catch((err) => {
+      console.warn('Video play error:', err);
+    });
+  } catch (e) {}
+
+  let crossFadeDone = false;
+  const executeCrossFade = () => {
+    if (crossFadeDone) return;
+    crossFadeDone = true;
 
     // Fade targetVideo in smoothly over currentVideo
     targetVideo.classList.add('is-visible');
 
-    // Wait for the CSS opacity transition (350ms) to complete before hiding/pausing currentVideo
+    // Wait for the CSS opacity transition (350ms) to complete
     setTimeout(() => {
+      // Outgoing video is now completely covered by targetVideo
       if (currentVideo && currentVideo !== targetVideo) {
         currentVideo.classList.remove('is-visible', 'is-top');
-        setTimeout(() => {
-          const isStillCurrent = (currentVideo === journey && state.currentVideo === 'journey') ||
-                                (currentVideo === rainVideo && state.currentVideo === 'rain') ||
-                                (currentVideo === stopVideo && state.currentVideo === 'stop');
-          if (!isStillCurrent) {
-            try { currentVideo.pause(); } catch (e) {}
-          }
-        }, 120);
+        try { currentVideo.pause(); } catch (e) {}
       }
       targetVideo.classList.remove('is-top');
       if (onComplete) onComplete();
-    }, 360);
+    }, 380);
+  };
+
+  // If target video is ALREADY rendering frames and actively playing
+  if (targetVideo.readyState >= 3 && !targetVideo.paused && targetVideo.currentTime > 0) {
+    executeCrossFade();
+    return;
+  }
+
+  // Wait until targetVideo ACTUALLY produces a frame before fading it in or pausing currentVideo!
+  let cleanupListeners = null;
+  const onReadyToDisplay = () => {
+    if (cleanupListeners) cleanupListeners();
+    executeCrossFade();
   };
 
   if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
     try {
       targetVideo.requestVideoFrameCallback(() => {
-        triggerCrossFade();
+        onReadyToDisplay();
       });
-    } catch (e) {
-      triggerCrossFade();
-    }
+    } catch (e) {}
   }
 
-  const onPlaySignal = () => {
-    targetVideo.removeEventListener('playing', onPlaySignal);
-    targetVideo.removeEventListener('timeupdate', onPlaySignal);
-    triggerCrossFade();
+  const onPlaying = () => onReadyToDisplay();
+  const onTimeUpdate = () => {
+    if (targetVideo.currentTime > 0) onReadyToDisplay();
   };
 
-  targetVideo.addEventListener('playing', onPlaySignal, { once: true });
-  targetVideo.addEventListener('timeupdate', onPlaySignal, { once: true });
+  targetVideo.addEventListener('playing', onPlaying, { once: true });
+  targetVideo.addEventListener('timeupdate', onTimeUpdate, { once: true });
 
-  setTimeout(triggerCrossFade, 200);
+  cleanupListeners = () => {
+    targetVideo.removeEventListener('playing', onPlaying);
+    targetVideo.removeEventListener('timeupdate', onTimeUpdate);
+  };
+
+  // Safety fallback: if video takes more than 1.2s to buffer, execute crossfade so it never hangs
+  setTimeout(onReadyToDisplay, 1200);
 }
 
 let isTogglingRain = false;
@@ -639,9 +648,8 @@ function makeStop() {
     stopVideo.src = journeyConfig.videos.stop;
   }
 
-  // Enable audio for stop video and set realistic volume
-  stopVideo.muted = false;
-  stopVideo.volume = journeyConfig.volumes.effects ?? 0.9;
+  // Ensure stopVideo is muted so browser autoplay policies never block playback
+  stopVideo.muted = true;
 
   try {
     if (stopVideo.currentTime !== 0) {
@@ -652,19 +660,20 @@ function makeStop() {
   state.currentVideo = 'stop';
   notify('Stopping at the next stop…');
 
-  switchSceneVideo(stopVideo, journey, () => {
-    clearTimeout(stopFallbackTimer);
-    const dur = (Number.isFinite(stopVideo.duration) && stopVideo.duration > 0)
-      ? stopVideo.duration
-      : 7.5;
-    const timeoutMs = Math.ceil(dur * 1000) + 1200;
+  // Watchdog timer: guarantees journey resumes even if device stalls or drops video playback
+  clearTimeout(stopFallbackTimer);
+  const dur = (Number.isFinite(stopVideo.duration) && stopVideo.duration > 0)
+    ? stopVideo.duration
+    : 7.5;
+  const timeoutMs = Math.ceil(dur * 1000) + 1200;
 
-    stopFallbackTimer = setTimeout(() => {
-      if (state.isStopping) {
-        onStopEnded();
-      }
-    }, timeoutMs);
-  });
+  stopFallbackTimer = setTimeout(() => {
+    if (state.isStopping) {
+      onStopEnded();
+    }
+  }, timeoutMs);
+
+  switchSceneVideo(stopVideo, journey);
 }
 
 let currentStartupSound = null;
