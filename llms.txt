@@ -1,0 +1,21 @@
+﻿# KSRTC Radio
+
+> KSRTC Radio (ആനവണ്ടി) is an independent online nostalgia experience inspired by Kerala KSRTC bus journeys.
+
+## Website
+https://ksrtcradio.online/
+
+## About
+KSRTC Radio combines Malayalam music, bus ambience, engine sounds and rain experiences to recreate the atmosphere of travelling through Kerala by bus.
+
+## Creator
+Benson Thomas
+
+## Topics
+- KSRTC Radio
+- Kerala KSRTC
+- ആനവണ്ടി
+- Kerala bus journeys
+- Malayalam music
+- Kerala bus nostalgia
+- KSRTC bus sounds
