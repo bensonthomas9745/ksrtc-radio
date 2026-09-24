@@ -470,16 +470,28 @@ function toggleRain() {
   els.rain.setAttribute('aria-label', state.isRainMode ? 'Turn rain off' : 'Turn rain on');
   updateRainBarState(state.isRainMode);
   if (state.isRainMode) {
-    journey.pause();
-    journey.classList.remove('is-visible');
-    rainVideo.currentTime = 0;
-    rainVideo.classList.add('is-visible');
-    playSafe(rainVideo);
-    state.currentVideo = 'rain';
-    rainAudio.volume = currentRainVolume / 100;
-    rainAudio.currentTime = 0;
-    syncRainAudio();
-    notify('Rain on.');
+    if (!rainVideo.src || rainVideo.src === window.location.href) {
+      rainVideo.src = journeyConfig.videos.rain;
+    }
+    const startRainPlayback = () => {
+      journey.pause();
+      journey.classList.remove('is-visible');
+      rainVideo.currentTime = 0;
+      rainVideo.classList.add('is-visible');
+      playSafe(rainVideo);
+      state.currentVideo = 'rain';
+      rainAudio.volume = currentRainVolume / 100;
+      rainAudio.currentTime = 0;
+      syncRainAudio();
+      notify('Rain on.');
+    };
+    if (rainVideo.readyState >= 3) {
+      startRainPlayback();
+    } else {
+      rainVideo.load();
+      rainVideo.addEventListener('canplay', startRainPlayback, { once: true });
+      setTimeout(startRainPlayback, 500);
+    }
   } else {
     rainAudio.pause();
     rainAudio.currentTime = 0;
@@ -510,6 +522,7 @@ function makeStop() {
   const label = els.stop.querySelector('small');
   if (label) label.textContent = 'Stopping…';
   playSoundEffect(bellAudio);
+  notify('Stopping at the next stop…');
 
   if (!stopVideo.src || stopVideo.src === window.location.href) {
     stopVideo.src = journeyConfig.videos.stop;
@@ -519,49 +532,64 @@ function makeStop() {
   stopVideo.muted = false;
   stopVideo.volume = journeyConfig.volumes.effects ?? 0.9;
 
-  try {
-    stopVideo.currentTime = 0;
-  } catch (e) {}
+  let hasStartedStopVideo = false;
+  const startStopPlayback = () => {
+    if (hasStartedStopVideo) return;
+    hasStartedStopVideo = true;
 
-  journey.pause();
-  journey.classList.remove('is-visible');
-  stopVideo.classList.add('is-visible');
+    try {
+      stopVideo.currentTime = 0;
+    } catch (e) {}
 
-  // Pause music during the stop sequence so the bus stop audio is clearly heard
-  wasMusicPlayingBeforeStop = state.isPlaying;
-  if (wasMusicPlayingBeforeStop) {
-    pauseMusic();
-  }
+    journey.pause();
+    journey.classList.remove('is-visible');
+    stopVideo.classList.add('is-visible');
 
-  try {
-    const playPromise = stopVideo.play();
-    if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch(() => {
-        // Fallback: if browser blocks unmuted playback, play muted
-        stopVideo.muted = true;
-        stopVideo.play().catch(() => {});
-      });
+    // Pause music during the stop sequence so the bus stop audio is clearly heard
+    wasMusicPlayingBeforeStop = state.isPlaying;
+    if (wasMusicPlayingBeforeStop) {
+      pauseMusic();
     }
-  } catch (e) {
-    stopVideo.muted = true;
-    stopVideo.play().catch(() => {});
-  }
 
-  state.currentVideo = 'stop';
-  notify('Stopping at the next stop…');
-
-  // Watchdog timer: guarantees journey resumes even if device freezes, stalls, or drops video playback
-  clearTimeout(stopFallbackTimer);
-  const dur = (Number.isFinite(stopVideo.duration) && stopVideo.duration > 0)
-    ? stopVideo.duration
-    : 7.5;
-  const timeoutMs = Math.ceil(dur * 1000) + 1200;
-
-  stopFallbackTimer = setTimeout(() => {
-    if (state.isStopping) {
-      onStopEnded();
+    try {
+      const playPromise = stopVideo.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(() => {
+          // Fallback: if browser blocks unmuted playback, play muted
+          stopVideo.muted = true;
+          stopVideo.play().catch(() => {});
+        });
+      }
+    } catch (e) {
+      stopVideo.muted = true;
+      stopVideo.play().catch(() => {});
     }
-  }, timeoutMs);
+
+    state.currentVideo = 'stop';
+
+    // Watchdog timer: guarantees journey resumes even if device freezes, stalls, or drops video playback
+    clearTimeout(stopFallbackTimer);
+    const dur = (Number.isFinite(stopVideo.duration) && stopVideo.duration > 0)
+      ? stopVideo.duration
+      : 7.5;
+    const timeoutMs = Math.ceil(dur * 1000) + 1200;
+
+    stopFallbackTimer = setTimeout(() => {
+      if (state.isStopping) {
+        onStopEnded();
+      }
+    }, timeoutMs);
+  };
+
+  // If already buffered enough to play without delay, play immediately!
+  if (stopVideo.readyState >= 3) {
+    startStopPlayback();
+  } else {
+    stopVideo.load();
+    stopVideo.addEventListener('canplay', startStopPlayback, { once: true });
+    stopVideo.addEventListener('loadeddata', startStopPlayback, { once: true });
+    setTimeout(startStopPlayback, 600);
+  }
 }
 
 let currentStartupSound = null;
@@ -576,6 +604,9 @@ function startJourney() {
 
   // Preload all audio assets on this user gesture so they are ready when loading finishes
   preloadAudioAssets();
+
+  // Start buffering secondary videos immediately during the 8-second countdown!
+  initSecondaryVideos();
 
   currentStartupSound = startAudio;
   playSoundEffect(startAudio);
