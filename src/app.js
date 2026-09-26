@@ -1362,6 +1362,27 @@ let popBubbleTimer = null;
 let popBubbleFadeTimer = null;
 const CHAT_USERNAME_KEY = 'ksrtc_chat_passenger_name';
 
+const ADMIN_SECRET_KEY = 'admin9745962741';
+const VERIFIED_TICK_SVG = `<svg class="verified-tick-icon" viewBox="0 0 24 24" width="13" height="13" fill="#38bdf8" title="Verified Station Admin" aria-label="Verified Station Admin"><path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/></svg>`;
+
+let isAdminVerified = false;
+try {
+  if (localStorage.getItem('ksrtc_admin_auth_key') === ADMIN_SECRET_KEY) {
+    isAdminVerified = true;
+  }
+} catch (e) {}
+
+function updateAdminUI() {
+  const verifiedBadge = $('chat-verified-badge');
+  if (verifiedBadge) {
+    verifiedBadge.hidden = !isAdminVerified;
+  }
+  if (chatUsernameInput && isAdminVerified) {
+    chatUsernameInput.value = 'Admin';
+    chatUsernameInput.style.color = '#38bdf8';
+  }
+}
+
 // Curated vibrant, high-contrast palette for passenger name tags
 const PASSENGER_COLORS = [
   '#38bdf8', // Sky Blue
@@ -1394,16 +1415,20 @@ function getPassengerColor(name) {
 }
 
 /* ==========================================================================
-   Popping Passenger Chat Message (Floats on top of the song for 2 seconds)
+   Apple-Style Pop-up Message Balloon (Floats on top of the song slider)
    ========================================================================== */
-function triggerSongPoppingMessage(senderName, text, color) {
+function triggerSongPoppingMessage(senderName, text, color, isVerified = false) {
   if (!chatPopBubble || !chatPopSender || !chatPopText) return;
   if (!senderName || senderName.toLowerCase() === 'system') return;
 
   clearTimeout(popBubbleTimer);
   clearTimeout(popBubbleFadeTimer);
 
-  chatPopSender.textContent = senderName;
+  if (isVerified) {
+    chatPopSender.innerHTML = `${escapeHtml(senderName)} ${VERIFIED_TICK_SVG}`;
+  } else {
+    chatPopSender.textContent = senderName;
+  }
   chatPopSender.style.color = color;
   chatPopText.textContent = text;
 
@@ -1412,7 +1437,7 @@ function triggerSongPoppingMessage(senderName, text, color) {
   void chatPopBubble.offsetWidth; // Force layout recalculation for fresh CSS animation
   chatPopBubble.classList.add('is-popping');
 
-  // Pop message disappears after exactly 2 seconds
+  // Pop message balloon disappears after exactly 2 seconds
   popBubbleTimer = setTimeout(() => {
     chatPopBubble.classList.add('is-leaving');
     chatPopBubble.classList.remove('is-popping');
@@ -1420,7 +1445,7 @@ function triggerSongPoppingMessage(senderName, text, color) {
     popBubbleFadeTimer = setTimeout(() => {
       chatPopBubble.hidden = true;
       chatPopBubble.classList.remove('is-leaving');
-    }, 260);
+    }, 240);
   }, 2000);
 }
 
@@ -1492,9 +1517,17 @@ if (chatBackdrop) {
 
 function getStoredOrRandomUsername() {
   try {
+    if (localStorage.getItem('ksrtc_admin_auth_key') === ADMIN_SECRET_KEY) {
+      isAdminVerified = true;
+      return 'Admin';
+    }
     const saved = localStorage.getItem(CHAT_USERNAME_KEY);
     if (saved && saved.trim()) {
-      return saved.trim().slice(0, 24);
+      if (saved.trim().toLowerCase() === 'admin') {
+        // Not verified admin, discard
+      } else {
+        return saved.trim().slice(0, 24);
+      }
     }
   } catch (e) {}
 
@@ -1508,26 +1541,78 @@ function getStoredOrRandomUsername() {
 
 let currentChatUsername = getStoredOrRandomUsername();
 
-if (chatUsernameInput) {
-  chatUsernameInput.value = currentChatUsername;
-  chatUsernameInput.style.color = getPassengerColor(currentChatUsername);
+function processUsernameInput(rawVal) {
+  const trimmed = rawVal.trim();
+  const lower = trimmed.toLowerCase();
 
-  chatUsernameInput.addEventListener('input', (e) => {
-    let val = e.target.value.trim().slice(0, 24);
-    if (!val) {
-      val = 'Passenger';
+  // If admin secret key is entered
+  if (lower === ADMIN_SECRET_KEY) {
+    isAdminVerified = true;
+    currentChatUsername = 'Admin';
+    try {
+      localStorage.setItem('ksrtc_admin_auth_key', ADMIN_SECRET_KEY);
+      localStorage.setItem(CHAT_USERNAME_KEY, 'Admin');
+    } catch (e) {}
+    if (chatUsernameInput) {
+      chatUsernameInput.value = 'Admin';
+      chatUsernameInput.style.color = '#38bdf8';
     }
-    currentChatUsername = val;
-    chatUsernameInput.style.color = getPassengerColor(currentChatUsername);
+    updateAdminUI();
+    notify('Station Admin verified!');
+    return;
+  }
+
+  // If someone tries to use the name "Admin" without the secret key
+  if (lower === 'admin') {
+    if (isAdminVerified) {
+      return; // Already verified admin
+    }
+    notify('The name "Admin" is reserved.');
+    currentChatUsername = `Passenger #${Math.floor(100 + Math.random() * 900)}`;
     try {
       localStorage.setItem(CHAT_USERNAME_KEY, currentChatUsername);
-    } catch (err) {}
+      localStorage.removeItem('ksrtc_admin_auth_key');
+    } catch (e) {}
+    if (chatUsernameInput) {
+      chatUsernameInput.value = currentChatUsername;
+      chatUsernameInput.style.color = getPassengerColor(currentChatUsername);
+    }
+    isAdminVerified = false;
+    updateAdminUI();
+    return;
+  }
+
+  // If previous admin changed name away from Admin
+  if (isAdminVerified && lower !== 'admin') {
+    isAdminVerified = false;
+    try { localStorage.removeItem('ksrtc_admin_auth_key'); } catch (e) {}
+    updateAdminUI();
+  }
+
+  currentChatUsername = trimmed.slice(0, 24) || 'Passenger';
+  if (chatUsernameInput) {
+    chatUsernameInput.style.color = getPassengerColor(currentChatUsername);
+  }
+  try {
+    localStorage.setItem(CHAT_USERNAME_KEY, currentChatUsername);
+  } catch (e) {}
+}
+
+if (chatUsernameInput) {
+  chatUsernameInput.value = currentChatUsername;
+  chatUsernameInput.style.color = isAdminVerified ? '#38bdf8' : getPassengerColor(currentChatUsername);
+  updateAdminUI();
+
+  chatUsernameInput.addEventListener('input', (e) => {
+    processUsernameInput(e.target.value);
   });
 
   chatUsernameInput.addEventListener('blur', () => {
     if (!chatUsernameInput.value.trim()) {
       chatUsernameInput.value = currentChatUsername;
-      chatUsernameInput.style.color = getPassengerColor(currentChatUsername);
+      chatUsernameInput.style.color = isAdminVerified ? '#38bdf8' : getPassengerColor(currentChatUsername);
+    } else {
+      processUsernameInput(chatUsernameInput.value);
     }
   });
 }
@@ -1555,7 +1640,10 @@ if (chatForm && chatMessageInput) {
       return;
     }
 
-    const activeName = (chatUsernameInput ? chatUsernameInput.value.trim() : '') || currentChatUsername || 'Passenger';
+    let activeName = (chatUsernameInput ? chatUsernameInput.value.trim() : '') || currentChatUsername || 'Passenger';
+    if (activeName.toLowerCase() === 'admin' && !isAdminVerified) {
+      activeName = 'Passenger';
+    }
 
     if (chatSendBtn) {
       chatSendBtn.disabled = true;
@@ -1563,7 +1651,7 @@ if (chatForm && chatMessageInput) {
 
     lastChatMessageTime = now;
 
-    sendChatMessageFn(activeName.slice(0, 24), text)
+    sendChatMessageFn(activeName.slice(0, 24), text, isAdminVerified)
       .then(() => {
         chatMessageInput.value = '';
         if (chatSendBtn) chatSendBtn.disabled = false;
@@ -1713,7 +1801,7 @@ function initLiveSessionsAndChat() {
     if (!chatMessagesContainer || seenMessageIds.has(msgId)) return;
     seenMessageIds.add(msgId);
 
-    const senderName = (data.name || 'Passenger').slice(0, 24);
+    let senderName = (data.name || 'Passenger').slice(0, 24);
     // System message is presented permanently as a note at the top
     if (senderName.toLowerCase() === 'system' || data.session === 'system_bot') {
       return;
@@ -1724,11 +1812,23 @@ function initLiveSessionsAndChat() {
     }
 
     const isMe = data.session === mySessionId;
+    const isVerified = (data.isAdmin === true && data.adminKey === ADMIN_SECRET_KEY) ||
+                       (senderName === 'Admin' && data.adminKey === ADMIN_SECRET_KEY);
+
+    // If an unauthorized person tried to name themselves Admin, show them as Passenger
+    if (senderName.toLowerCase() === 'admin' && !isVerified) {
+      senderName = 'Passenger';
+    }
+
     const text = (data.text || '').trim();
     if (!text) return;
 
-    const tagColor = isMe ? '#34d399' : getPassengerColor(senderName);
+    const tagColor = isVerified ? '#38bdf8' : (isMe ? '#34d399' : getPassengerColor(senderName));
     const timeStr = formatChatTime(data.timestamp);
+
+    const senderHtml = isVerified
+      ? `${escapeHtml(senderName)} ${VERIFIED_TICK_SVG}`
+      : escapeHtml(senderName);
 
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg ${isMe ? 'is-me' : ''}`;
@@ -1736,7 +1836,7 @@ function initLiveSessionsAndChat() {
 
     msgEl.innerHTML = `
       <div class="chat-msg-header">
-        <span class="chat-msg-sender" style="color: ${tagColor};">${escapeHtml(senderName)}</span>
+        <span class="chat-msg-sender" style="color: ${tagColor};">${senderHtml}</span>
         <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
       </div>
       <div class="chat-msg-text">${escapeHtml(text)}</div>
@@ -1758,9 +1858,9 @@ function initLiveSessionsAndChat() {
       }
     }
 
-    // Trigger 2-second popping message on top of the song for live messages!
+    // Trigger 2-second popping message on top of the song slider for live messages!
     if (isLive) {
-      triggerSongPoppingMessage(senderName, text, tagColor);
+      triggerSongPoppingMessage(senderName, text, tagColor, isVerified);
     }
   }
 
@@ -1832,13 +1932,19 @@ function initLiveSessionsAndChat() {
         isInitialChatHistoryLoaded = true;
       }, 1200);
 
-      sendChatMessageFn = (name, text) => {
-        return push(messagesRef, {
+      sendChatMessageFn = (name, text, isSenderAdmin = false) => {
+        const payload = {
           name,
           text,
           session: mySessionId,
           timestamp: serverTimestamp()
-        });
+        };
+        if (isSenderAdmin && isAdminVerified) {
+          payload.name = 'Admin';
+          payload.isAdmin = true;
+          payload.adminKey = ADMIN_SECRET_KEY;
+        }
+        return push(messagesRef, payload);
       };
 
       isChatConnected = true;

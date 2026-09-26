@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=33" />
+    <link rel="stylesheet" href="./src/styles.css?v=34" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -207,16 +207,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </section>
 
       <section class="player" id="player" aria-label="Music player" hidden>
-        <!-- Real-time popping passenger chat bubble for 2 seconds on top of the song -->
-        <div id="chat-pop-bubble" class="chat-pop-bubble" hidden aria-live="polite" title="Open Passenger Chat">
-          <div class="chat-pop-bubble-inner">
-            <span class="chat-pop-icon" aria-hidden="true">💬</span>
-            <span class="chat-pop-sender" id="chat-pop-sender">Passenger</span>
-            <span class="chat-pop-sep">:</span>
-            <span class="chat-pop-text" id="chat-pop-text">Welcome!</span>
-          </div>
-        </div>
-
         <div class="now-playing">
           <div class="album-art">
             <img id="album-art" src="https://img.youtube.com/vi/IL4H0erw0Bk/hqdefault.jpg" alt="Current playing song album art" />
@@ -230,7 +220,21 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <div class="track-meta">
             <div class="track-title" id="track-title">Chirimanimulle</div>
             <div class="track-artist" id="track-artist">Lion (Malayalam Movie)</div>
-            <input id="progress" class="progress" aria-label="Seek song" type="range" min="0" max="100" value="0" />
+
+            <div class="slider-balloon-wrap">
+              <!-- Apple-style Pop up message balloon for 2s on top of the song slider -->
+              <div id="chat-pop-bubble" class="chat-slider-balloon" hidden aria-live="polite" title="Tap to open Passenger Chat">
+                <div class="chat-balloon-bubble">
+                  <span class="chat-balloon-icon" aria-hidden="true">💬</span>
+                  <span class="chat-balloon-sender" id="chat-pop-sender">Passenger</span>
+                  <span class="chat-balloon-sep">:</span>
+                  <span class="chat-balloon-text" id="chat-pop-text">Welcome!</span>
+                </div>
+                <div class="chat-balloon-tail" aria-hidden="true"></div>
+              </div>
+              <input id="progress" class="progress" aria-label="Seek song" type="range" min="0" max="100" value="0" />
+            </div>
+
             <div class="time-row"><span id="current-time">0:00</span><span id="duration">0:00</span></div>
           </div>
         </div>
@@ -380,7 +384,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
           <div class="chat-user-bar">
             <label for="chat-username-input" class="chat-user-label">Your Name:</label>
-            <input type="text" id="chat-username-input" class="chat-username-input" placeholder="e.g. Passenger #24" maxlength="24" autocomplete="off" />
+            <div class="chat-username-field-wrap">
+              <input type="text" id="chat-username-input" class="chat-username-input" placeholder="e.g. Passenger #24" maxlength="24" autocomplete="off" />
+              <span class="chat-verified-badge" id="chat-verified-badge" title="Verified Station Admin" hidden aria-label="Verified Station Admin">
+                <svg class="verified-tick-icon" viewBox="0 0 24 24" width="14" height="14" fill="#38bdf8">
+                  <path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/>
+                </svg>
+              </span>
+            </div>
           </div>
 
           <!-- Pinned Station Note at the Top of Chat -->

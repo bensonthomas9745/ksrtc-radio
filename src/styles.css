@@ -966,8 +966,30 @@ button { color:inherit; cursor:pointer; }
   white-space: nowrap;
   font-weight: 500;
 }
+.chat-username-field-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.chat-verified-badge {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  pointer-events: none;
+}
+.chat-verified-badge[hidden] {
+  display: none !important;
+}
+.verified-tick-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
 .chat-username-input {
   flex: 1;
+  width: 100%;
   height: 28px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.07);
@@ -975,9 +997,9 @@ button { color:inherit; cursor:pointer; }
   color: #f5c871;
   font-weight: 500;
   font-size: 12px;
-  padding: 0 9px;
+  padding: 0 26px 0 9px;
   outline: none;
-  transition: border-color .2s, background .2s;
+  transition: border-color .2s, background .2s, color .2s;
   box-sizing: border-box;
 }
 .chat-username-input:focus {
@@ -1187,99 +1209,124 @@ button { color:inherit; cursor:pointer; }
 }
 
 /* ==========================================================================
-   Popping Passenger Chat Message (Floats on top of the song for 2 seconds)
+   Apple-Style Pop-up Message Balloon (Floats on top of the song slider)
    ========================================================================== */
-.chat-pop-bubble {
+.slider-balloon-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.chat-slider-balloon {
   position: absolute;
-  bottom: calc(100% + 14px);
+  bottom: calc(100% + 9px);
   left: 50%;
-  transform: translateX(-50%) translateY(8px) scale(0.9);
-  z-index: 30;
+  transform: translateX(-50%) translateY(5px) scale(0.88);
+  z-index: 35;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .22s cubic-bezier(0.16, 1, 0.3, 1), transform .26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity .2s ease, transform .26s cubic-bezier(0.34, 1.56, 0.64, 1);
   width: max-content;
-  max-width: min(480px, calc(100vw - 32px));
+  max-width: min(340px, calc(100vw - 80px));
 }
-.chat-pop-bubble[hidden] {
+.chat-slider-balloon[hidden] {
   display: none !important;
 }
-.chat-pop-bubble.is-popping {
+.chat-slider-balloon.is-popping {
   opacity: 1;
   transform: translateX(-50%) translateY(0) scale(1);
   pointer-events: auto;
 }
-.chat-pop-bubble.is-leaving {
+.chat-slider-balloon.is-leaving {
   opacity: 0;
-  transform: translateX(-50%) translateY(-6px) scale(0.92);
-  transition: opacity .25s ease, transform .25s ease;
+  transform: translateX(-50%) translateY(4px) scale(0.92);
+  transition: opacity .22s ease, transform .22s ease;
 }
 
-.chat-pop-bubble-inner {
+.chat-balloon-bubble {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5.5px 14px 5.5px 11px;
-  background: rgba(18, 20, 24, 0.9);
+  gap: 5px;
+  padding: 4.5px 12px 4.5px 9px;
+  background: rgba(20, 22, 26, 0.94);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 1px rgba(255, 255, 255, 0.22);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.72), inset 0 1px 1px rgba(255, 255, 255, 0.16);
   cursor: pointer;
   user-select: none;
-  transition: transform .15s ease, background .2s ease, border-color .2s ease;
   max-width: 100%;
   box-sizing: border-box;
+  transition: transform .15s ease, background .2s ease;
 }
-.chat-pop-bubble-inner:hover {
+.chat-balloon-bubble:hover {
   transform: scale(1.03);
-  background: rgba(28, 30, 36, 0.96);
-  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(28, 30, 36, 0.98);
+  border-color: rgba(255, 255, 255, 0.36);
 }
-.chat-pop-bubble-inner:active {
+.chat-balloon-bubble:active {
   transform: scale(0.96);
 }
 
-.chat-pop-icon {
-  font-size: 13px;
+.chat-balloon-tail {
+  position: absolute;
+  bottom: -4.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 5px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: rgba(20, 22, 26, 0.96);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+  pointer-events: none;
+}
+
+.chat-balloon-icon {
+  font-size: 11.5px;
   line-height: 1;
   flex-shrink: 0;
 }
-.chat-pop-sender {
-  font-size: 11.5px;
+.chat-balloon-sender {
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
-.chat-pop-sep {
-  opacity: 0.5;
+.chat-balloon-sep {
+  opacity: 0.45;
   color: #fff;
-  font-size: 11.5px;
+  font-size: 11px;
   flex-shrink: 0;
 }
-.chat-pop-text {
-  font-size: 12px;
-  color: #f7f3ec;
-  font-weight: 400;
+.chat-balloon-text {
+  font-size: 11.5px;
+  color: #f3efe6;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 260px;
+  max-width: 190px;
 }
 
 @media (max-width: 700px) {
-  .chat-pop-bubble {
-    bottom: calc(100% + 10px);
+  .chat-slider-balloon {
+    max-width: min(280px, calc(100vw - 60px));
   }
-  .chat-pop-text {
-    max-width: 170px;
+  .chat-balloon-text {
+    max-width: 130px;
   }
 }
 @media (max-width: 390px) {
-  .chat-pop-text {
-    max-width: 125px;
+  .chat-slider-balloon {
+    max-width: min(230px, calc(100vw - 40px));
+  }
+  .chat-balloon-text {
+    max-width: 95px;
   }
 }
 
