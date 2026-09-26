@@ -1163,6 +1163,9 @@ function scrollToCurrentSong() {
 
 function openPlaylistDrawer() {
   if (!playlistDrawerWrap) return;
+  if (typeof closeChatDrawer === 'function') {
+    closeChatDrawer();
+  }
   clearTimeout(drawerCloseTimer);
   playlistDrawerWrap.hidden = false;
   void playlistDrawerWrap.offsetWidth; // force browser layout recalculation
@@ -1248,8 +1251,13 @@ if (drawerJumpBtn) {
 }
 
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && playlistDrawerWrap && !playlistDrawerWrap.hidden) {
-    closePlaylistDrawer();
+  if (e.key === 'Escape') {
+    if (playlistDrawerWrap && !playlistDrawerWrap.hidden) {
+      closePlaylistDrawer();
+    }
+    if (typeof closeChatDrawer === 'function' && chatDrawerWrap && !chatDrawerWrap.hidden) {
+      closeChatDrawer();
+    }
   }
 });
 
@@ -1327,13 +1335,177 @@ if (els.fullscreenBtn) {
 updateFullscreenUI();
 
 /* ==========================================================================
-   Live Sessions Indicator (Website Real-Time Session Tracker)
-   Tracks active sessions open on the website across tabs and peer connections.
+   Apple-Style Live Passenger Chat Controller & Real-Time Presence
+   Frictionless live chat and listener presence aboard KSRTC Radio
    ========================================================================== */
-function initLiveSessionsTracker() {
-  const liveCountEl = $('live-count');
-  if (!liveCountEl) return;
+const chatToggle = $('chat-toggle');
+const chatDrawerWrap = $('chat-drawer-wrap');
+const chatDrawer = $('chat-drawer');
+const chatBackdrop = $('chat-backdrop');
+const chatCloseBtn = $('chat-close-btn');
+const chatUsernameInput = $('chat-username-input');
+const chatMessagesContainer = $('chat-messages-container');
+const chatEmptyState = $('chat-empty-state');
+const chatForm = $('chat-form');
+const chatMessageInput = $('chat-message-input');
+const chatSendBtn = $('chat-send-btn');
+const chatUnreadDot = $('chat-unread-dot');
 
+let chatDrawerCloseTimer = null;
+let lastChatMessageTime = 0;
+let isChatConnected = false;
+let sendChatMessageFn = null;
+const CHAT_USERNAME_KEY = 'ksrtc_chat_passenger_name';
+
+function isChatOpen() {
+  return Boolean(chatDrawerWrap && chatDrawerWrap.classList.contains('is-open'));
+}
+
+function openChatDrawer() {
+  if (!chatDrawerWrap) return;
+  if (typeof closePlaylistDrawer === 'function') {
+    closePlaylistDrawer();
+  }
+  clearTimeout(chatDrawerCloseTimer);
+  chatDrawerWrap.hidden = false;
+  void chatDrawerWrap.offsetWidth;
+  chatDrawerWrap.classList.add('is-open');
+  if (chatToggle) chatToggle.setAttribute('aria-expanded', 'true');
+
+  if (chatUnreadDot) {
+    chatUnreadDot.hidden = true;
+  }
+
+  if (chatMessagesContainer) {
+    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+  }
+
+  setTimeout(() => {
+    if (chatMessageInput && !('ontouchstart' in window)) {
+      chatMessageInput.focus();
+    }
+  }, 140);
+}
+
+function closeChatDrawer() {
+  if (!chatDrawerWrap) return;
+  chatDrawerWrap.classList.remove('is-open');
+  if (chatToggle) chatToggle.setAttribute('aria-expanded', 'false');
+  clearTimeout(chatDrawerCloseTimer);
+  chatDrawerCloseTimer = setTimeout(() => {
+    if (!chatDrawerWrap.classList.contains('is-open')) {
+      chatDrawerWrap.hidden = true;
+    }
+  }, 380);
+}
+
+function toggleChatDrawer() {
+  if (isChatOpen()) {
+    closeChatDrawer();
+  } else {
+    openChatDrawer();
+  }
+}
+
+if (chatToggle) {
+  chatToggle.addEventListener('click', toggleChatDrawer);
+}
+if (chatCloseBtn) {
+  chatCloseBtn.addEventListener('click', closeChatDrawer);
+}
+if (chatBackdrop) {
+  chatBackdrop.addEventListener('click', closeChatDrawer);
+}
+
+function getStoredOrRandomUsername() {
+  try {
+    const saved = localStorage.getItem(CHAT_USERNAME_KEY);
+    if (saved && saved.trim()) {
+      return saved.trim().slice(0, 24);
+    }
+  } catch (e) {}
+
+  const randomNum = Math.floor(100 + Math.random() * 900);
+  const defaultName = `Passenger #${randomNum}`;
+  try {
+    localStorage.setItem(CHAT_USERNAME_KEY, defaultName);
+  } catch (e) {}
+  return defaultName;
+}
+
+let currentChatUsername = getStoredOrRandomUsername();
+
+if (chatUsernameInput) {
+  chatUsernameInput.value = currentChatUsername;
+
+  chatUsernameInput.addEventListener('input', (e) => {
+    let val = e.target.value.trim().slice(0, 24);
+    if (!val) {
+      val = 'Passenger';
+    }
+    currentChatUsername = val;
+    try {
+      localStorage.setItem(CHAT_USERNAME_KEY, currentChatUsername);
+    } catch (err) {}
+  });
+
+  chatUsernameInput.addEventListener('blur', () => {
+    if (!chatUsernameInput.value.trim()) {
+      chatUsernameInput.value = currentChatUsername;
+    }
+  });
+}
+
+if (chatForm && chatMessageInput) {
+  chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const text = chatMessageInput.value.trim();
+    if (!text) return;
+
+    if (text.length > 140) {
+      notify('Message must be 140 characters or fewer.');
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastChatMessageTime < 1200) {
+      notify('Please wait a moment before sending again.');
+      return;
+    }
+
+    if (!isChatConnected || typeof sendChatMessageFn !== 'function') {
+      notify('Connecting to live passenger chat...');
+      return;
+    }
+
+    const activeName = (chatUsernameInput ? chatUsernameInput.value.trim() : '') || currentChatUsername || 'Passenger';
+
+    if (chatSendBtn) {
+      chatSendBtn.disabled = true;
+    }
+
+    lastChatMessageTime = now;
+
+    sendChatMessageFn(activeName.slice(0, 24), text)
+      .then(() => {
+        chatMessageInput.value = '';
+        if (chatSendBtn) chatSendBtn.disabled = false;
+        chatMessageInput.focus();
+      })
+      .catch((err) => {
+        console.warn('Chat send error:', err);
+        if (chatSendBtn) chatSendBtn.disabled = false;
+        notify('Unable to send message right now.');
+      });
+  });
+}
+
+/* ==========================================================================
+   Live Sessions Tracker & Global Firebase Realtime Database Layer
+   ========================================================================== */
+function initLiveSessionsAndChat() {
+  const liveCountEl = $('live-count');
   const STORAGE_KEY = 'ksrtc_live_sessions_v1';
   const HEARTBEAT_INTERVAL = 2500;
   const SESSION_TTL = 7000;
@@ -1356,6 +1528,7 @@ function initLiveSessionsTracker() {
     : null;
 
   function updateBadge(count) {
+    if (!liveCountEl) return;
     const finalCount = Math.max(1, count);
     if (liveCountEl.textContent !== String(finalCount)) {
       liveCountEl.textContent = String(finalCount);
@@ -1446,14 +1619,74 @@ function initLiveSessionsTracker() {
   window.addEventListener('beforeunload', removeLocalSession);
   window.addEventListener('pagehide', removeLocalSession);
 
-  // --- Global Firebase Realtime Database Presence Layer ---
+  // --- Real-time Passenger Chat Renderer ---
+  const seenMessageIds = new Set();
+
+  function formatChatTime(timestamp) {
+    if (!timestamp) return 'Just now';
+    try {
+      const d = new Date(timestamp);
+      if (Number.isNaN(d.getTime())) return 'Just now';
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return 'Just now';
+    }
+  }
+
+  function appendChatMessage(msgId, data) {
+    if (!chatMessagesContainer || seenMessageIds.has(msgId)) return;
+    seenMessageIds.add(msgId);
+
+    if (chatEmptyState) {
+      chatEmptyState.style.display = 'none';
+    }
+
+    const isMe = data.session === mySessionId;
+    const senderName = (data.name || 'Passenger').slice(0, 24);
+    const text = (data.text || '').trim();
+    if (!text) return;
+
+    const timeStr = formatChatTime(data.timestamp);
+
+    const msgEl = document.createElement('div');
+    msgEl.className = `chat-msg ${isMe ? 'is-me' : ''}`;
+    msgEl.dataset.id = msgId;
+
+    msgEl.innerHTML = `
+      <div class="chat-msg-header">
+        <span class="chat-msg-sender">${escapeHtml(senderName)}</span>
+        <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
+      </div>
+      <div class="chat-msg-text">${escapeHtml(text)}</div>
+    `;
+
+    const isScrolledToBottom =
+      chatMessagesContainer.scrollHeight - chatMessagesContainer.clientHeight <=
+      chatMessagesContainer.scrollTop + 60;
+
+    chatMessagesContainer.appendChild(msgEl);
+
+    if (isMe || isScrolledToBottom || isChatOpen()) {
+      chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+    }
+
+    if (!isChatOpen() && !isMe) {
+      if (chatUnreadDot) {
+        chatUnreadDot.hidden = false;
+      }
+    }
+  }
+
+  // --- Global Firebase Realtime Database Presence & Chat Layer ---
   try {
     Promise.all([
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js')
-    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, onDisconnect, serverTimestamp }]) => {
+    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, onDisconnect, serverTimestamp, query, limitToLast, onChildAdded }]) => {
       const app = initializeApp(firebaseConfig);
       const db = getDatabase(app);
+
+      // Presence
       const presenceListRef = ref(db, 'presence');
       const connectedRef = ref(db, '.info/connected');
 
@@ -1494,13 +1727,35 @@ function initLiveSessionsTracker() {
           try { set(myPresenceRef, null); } catch (e) {}
         }
       });
+
+      // Live Passenger Chat
+      const messagesRef = ref(db, 'messages');
+      const recentMessagesQuery = query(messagesRef, limitToLast(60));
+
+      onChildAdded(recentMessagesQuery, (snapshot) => {
+        const val = snapshot.val();
+        if (val && typeof val === 'object') {
+          appendChatMessage(snapshot.key, val);
+        }
+      });
+
+      sendChatMessageFn = (name, text) => {
+        return push(messagesRef, {
+          name,
+          text,
+          session: mySessionId,
+          timestamp: serverTimestamp()
+        });
+      };
+
+      isChatConnected = true;
     }).catch((err) => {
-      console.warn('Firebase live presence fallback to local session tracker:', err);
+      console.warn('Firebase connection fallback to local:', err);
     });
   } catch (err) {}
 }
 
-initLiveSessionsTracker();
+initLiveSessionsAndChat();
 
 
 
