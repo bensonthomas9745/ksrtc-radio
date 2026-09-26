@@ -1362,12 +1362,22 @@ let popBubbleTimer = null;
 let popBubbleFadeTimer = null;
 const CHAT_USERNAME_KEY = 'ksrtc_chat_passenger_name';
 
-const ADMIN_SECRET_KEY = 'admin9745962741';
+const ADMIN_PASSKEY_HASH = '4a1d5cc9d2ab47b32a1d81c93290bba7e549e7871f1e2babaa224b7ab2e6c946';
 const VERIFIED_TICK_SVG = `<svg class="verified-tick-icon" viewBox="0 0 24 24" width="13" height="13" fill="#38bdf8" title="Verified Station Admin" aria-label="Verified Station Admin"><path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/></svg>`;
+
+async function sha256Hex(str) {
+  try {
+    if (!str || !window.crypto || !window.crypto.subtle) return '';
+    const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(str.trim()));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    return '';
+  }
+}
 
 let isAdminVerified = false;
 try {
-  if (localStorage.getItem('ksrtc_admin_auth_key') === ADMIN_SECRET_KEY) {
+  if (localStorage.getItem('ksrtc_admin_auth_hash') === ADMIN_PASSKEY_HASH) {
     isAdminVerified = true;
   }
 } catch (e) {}
@@ -1517,7 +1527,7 @@ if (chatBackdrop) {
 
 function getStoredOrRandomUsername() {
   try {
-    if (localStorage.getItem('ksrtc_admin_auth_key') === ADMIN_SECRET_KEY) {
+    if (localStorage.getItem('ksrtc_admin_auth_hash') === ADMIN_PASSKEY_HASH) {
       isAdminVerified = true;
       return 'Admin';
     }
@@ -1541,17 +1551,19 @@ function getStoredOrRandomUsername() {
 
 let currentChatUsername = getStoredOrRandomUsername();
 
-function processUsernameInput(rawVal) {
+async function processUsernameInput(rawVal) {
   const trimmed = rawVal.trim();
   const lower = trimmed.toLowerCase();
 
-  // If admin secret key is entered
-  if (lower === ADMIN_SECRET_KEY) {
+  // Test hash of entered value against secret passkey hash
+  const hashedInput = await sha256Hex(trimmed);
+  if (hashedInput === ADMIN_PASSKEY_HASH) {
     isAdminVerified = true;
     currentChatUsername = 'Admin';
     try {
-      localStorage.setItem('ksrtc_admin_auth_key', ADMIN_SECRET_KEY);
+      localStorage.setItem('ksrtc_admin_auth_hash', ADMIN_PASSKEY_HASH);
       localStorage.setItem(CHAT_USERNAME_KEY, 'Admin');
+      localStorage.removeItem('ksrtc_admin_auth_key');
     } catch (e) {}
     if (chatUsernameInput) {
       chatUsernameInput.value = 'Admin';
@@ -1571,6 +1583,7 @@ function processUsernameInput(rawVal) {
     currentChatUsername = `Passenger #${Math.floor(100 + Math.random() * 900)}`;
     try {
       localStorage.setItem(CHAT_USERNAME_KEY, currentChatUsername);
+      localStorage.removeItem('ksrtc_admin_auth_hash');
       localStorage.removeItem('ksrtc_admin_auth_key');
     } catch (e) {}
     if (chatUsernameInput) {
@@ -1585,7 +1598,10 @@ function processUsernameInput(rawVal) {
   // If previous admin changed name away from Admin
   if (isAdminVerified && lower !== 'admin') {
     isAdminVerified = false;
-    try { localStorage.removeItem('ksrtc_admin_auth_key'); } catch (e) {}
+    try {
+      localStorage.removeItem('ksrtc_admin_auth_hash');
+      localStorage.removeItem('ksrtc_admin_auth_key');
+    } catch (e) {}
     updateAdminUI();
   }
 
@@ -1812,8 +1828,8 @@ function initLiveSessionsAndChat() {
     }
 
     const isMe = data.session === mySessionId;
-    const isVerified = (data.isAdmin === true && data.adminKey === ADMIN_SECRET_KEY) ||
-                       (senderName === 'Admin' && data.adminKey === ADMIN_SECRET_KEY);
+    const isVerified = (data.isAdmin === true && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH)) ||
+                       (senderName === 'Admin' && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH));
 
     // If an unauthorized person tried to name themselves Admin, show them as Passenger
     if (senderName.toLowerCase() === 'admin' && !isVerified) {
@@ -1942,7 +1958,7 @@ function initLiveSessionsAndChat() {
         if (isSenderAdmin && isAdminVerified) {
           payload.name = 'Admin';
           payload.isAdmin = true;
-          payload.adminKey = ADMIN_SECRET_KEY;
+          payload.adminToken = ADMIN_PASSKEY_HASH;
         }
         return push(messagesRef, payload);
       };
