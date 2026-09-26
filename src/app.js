@@ -1398,6 +1398,7 @@ function getPassengerColor(name) {
    ========================================================================== */
 function triggerSongPoppingMessage(senderName, text, color) {
   if (!chatPopBubble || !chatPopSender || !chatPopText) return;
+  if (!senderName || senderName.toLowerCase() === 'system') return;
 
   clearTimeout(popBubbleTimer);
   clearTimeout(popBubbleFadeTimer);
@@ -1712,12 +1713,17 @@ function initLiveSessionsAndChat() {
     if (!chatMessagesContainer || seenMessageIds.has(msgId)) return;
     seenMessageIds.add(msgId);
 
+    const senderName = (data.name || 'Passenger').slice(0, 24);
+    // System message is presented permanently as a note at the top
+    if (senderName.toLowerCase() === 'system' || data.session === 'system_bot') {
+      return;
+    }
+
     if (chatEmptyState) {
       chatEmptyState.style.display = 'none';
     }
 
     const isMe = data.session === mySessionId;
-    const senderName = (data.name || 'Passenger').slice(0, 24);
     const text = (data.text || '').trim();
     if (!text) return;
 
@@ -1730,10 +1736,7 @@ function initLiveSessionsAndChat() {
 
     msgEl.innerHTML = `
       <div class="chat-msg-header">
-        <span class="chat-msg-sender" style="color:${tagColor}; border-color:${tagColor}38; background:${tagColor}12;">
-          <span class="chat-msg-sender-dot" style="background:${tagColor}; box-shadow:0 0 6px ${tagColor}"></span>
-          ${escapeHtml(senderName)}
-        </span>
+        <span class="chat-msg-sender" style="color: ${tagColor};">${escapeHtml(senderName)}</span>
         <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
       </div>
       <div class="chat-msg-text">${escapeHtml(text)}</div>

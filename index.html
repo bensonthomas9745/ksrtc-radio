@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=32" />
+    <link rel="stylesheet" href="./src/styles.css?v=33" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -383,6 +383,19 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <input type="text" id="chat-username-input" class="chat-username-input" placeholder="e.g. Passenger #24" maxlength="24" autocomplete="off" />
           </div>
 
+          <!-- Pinned Station Note at the Top of Chat -->
+          <aside class="chat-system-note" id="chat-system-note" aria-label="Welcome and Guidelines Note">
+            <div class="chat-system-note-title">
+              <span class="chat-system-note-icon" aria-hidden="true">🚌</span>
+              <strong>Welcome aboard KSRTC Radio!</strong>
+            </div>
+            <div class="chat-system-note-body">
+              <p>💬 Feel free to text freely and share your thoughts.</p>
+              <p>⚠️ Please keep it respectful — no abusive, offensive, or inappropriate language.</p>
+              <p>🎶 Sit back, relax &amp; enjoy the ride! 🚍🌧️</p>
+            </div>
+          </aside>
+
           <div class="chat-messages-container" id="chat-messages-container" role="log" aria-live="polite">
             <div class="chat-empty-state" id="chat-empty-state">
               <span class="chat-empty-icon" aria-hidden="true">🚍</span>
@@ -404,6 +417,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=32"></script>
+    <script type="module" src="./src/app.js?v=33"></script>
   </body>
 </html>
