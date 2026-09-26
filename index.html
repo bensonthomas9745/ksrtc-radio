@@ -147,7 +147,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
           </svg>
           <span class="playlist-btn-label">Chat</span>
-          <span class="chat-unread-dot" id="chat-unread-dot" hidden aria-hidden="true"></span>
+          <span class="chat-unread-dot" id="chat-unread-dot" aria-hidden="true" title="Live Passenger Chat Active"></span>
         </button>
       </div>
 
@@ -407,6 +407,25 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             </div>
           </aside>
 
+          <!-- Admin Pinned Chat Banner -->
+          <aside class="chat-pinned-card" id="chat-pinned-card" hidden aria-label="Pinned Chat">
+            <div class="chat-pinned-header">
+              <span class="chat-pinned-tag">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
+                  <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/>
+                </svg>
+                PINNED CHAT
+              </span>
+              <button type="button" class="chat-unpin-btn" id="chat-unpin-btn" title="Unpin message" aria-label="Unpin message" hidden>
+                ✕ Unpin
+              </button>
+            </div>
+            <div class="chat-pinned-body">
+              <span class="chat-pinned-sender" id="chat-pinned-sender">Admin</span>
+              <span class="chat-pinned-text" id="chat-pinned-text"></span>
+            </div>
+          </aside>
+
           <div class="chat-messages-container" id="chat-messages-container" role="log" aria-live="polite">
             <div class="chat-empty-state" id="chat-empty-state">
               <span class="chat-empty-icon" aria-hidden="true">🚍</span>
@@ -428,6 +447,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=35"></script>
+    <script type="module" src="./src/app.js?v=36"></script>
   </body>
 </html>

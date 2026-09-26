@@ -1358,12 +1358,16 @@ let chatDrawerCloseTimer = null;
 let lastChatMessageTime = 0;
 let isChatConnected = false;
 let sendChatMessageFn = null;
+let deleteChatMessageFn = null;
+let pinChatMessageFn = null;
+let unpinChatMessageFn = null;
+let currentPinnedMessage = null;
 let popBubbleTimer = null;
 let popBubbleFadeTimer = null;
 const CHAT_USERNAME_KEY = 'ksrtc_chat_passenger_name';
 
 const ADMIN_PASSKEY_HASH = '4a1d5cc9d2ab47b32a1d81c93290bba7e549e7871f1e2babaa224b7ab2e6c946';
-const VERIFIED_TICK_SVG = `<svg class="verified-tick-icon" viewBox="0 0 24 24" width="13" height="13" fill="#38bdf8" title="Verified Station Admin" aria-label="Verified Station Admin"><path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/></svg>`;
+const VERIFIED_TICK_SVG = `<span class="verified-tick-wrap" title="Verified Station Admin" aria-label="Verified Station Admin"><svg class="verified-tick-icon" viewBox="0 0 24 24" width="14" height="14" fill="#38bdf8" aria-hidden="true"><path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/></svg></span>`;
 
 async function sha256Hex(str) {
   try {
@@ -1386,6 +1390,13 @@ function updateAdminUI() {
   const verifiedBadge = $('chat-verified-badge');
   if (verifiedBadge) {
     verifiedBadge.hidden = !isAdminVerified;
+  }
+  if (chatDrawerWrap) {
+    chatDrawerWrap.classList.toggle('is-admin-mode', Boolean(isAdminVerified));
+  }
+  const unpinBtn = $('chat-unpin-btn');
+  if (unpinBtn) {
+    unpinBtn.hidden = !isAdminVerified;
   }
   if (chatUsernameInput && isAdminVerified) {
     chatUsernameInput.value = 'Admin';
@@ -1479,10 +1490,6 @@ function openChatDrawer() {
   void chatDrawerWrap.offsetWidth;
   chatDrawerWrap.classList.add('is-open');
   if (chatToggle) chatToggle.setAttribute('aria-expanded', 'true');
-
-  if (chatUnreadDot) {
-    chatUnreadDot.hidden = true;
-  }
 
   if (chatMessagesContainer) {
     chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
@@ -1813,8 +1820,44 @@ function initLiveSessionsAndChat() {
     }
   }
 
+  function renderPinnedCard(data) {
+    currentPinnedMessage = data;
+    const card = $('chat-pinned-card');
+    const senderEl = $('chat-pinned-sender');
+    const textEl = $('chat-pinned-text');
+    const unpinBtn = $('chat-unpin-btn');
+    if (!card) return;
+
+    if (!data || !data.text) {
+      card.hidden = true;
+      return;
+    }
+
+    const isVerifiedSender = Boolean(
+      data.isVerified ||
+      data.adminToken === ADMIN_PASSKEY_HASH ||
+      (data.name && data.name.toLowerCase() === 'admin')
+    );
+    const color = isVerifiedSender ? '#38bdf8' : getPassengerColor(data.name);
+
+    if (senderEl) {
+      senderEl.innerHTML = isVerifiedSender
+        ? `${escapeHtml(data.name || 'Admin')} ${VERIFIED_TICK_SVG}`
+        : escapeHtml(data.name || 'Passenger');
+      senderEl.style.color = color;
+    }
+    if (textEl) {
+      textEl.textContent = data.text;
+    }
+    if (unpinBtn) {
+      unpinBtn.hidden = !isAdminVerified;
+    }
+    card.hidden = false;
+  }
+
   function appendChatMessage(msgId, data, isLive = false) {
     if (!chatMessagesContainer || seenMessageIds.has(msgId)) return;
+    if (msgId === '_pinned') return;
     seenMessageIds.add(msgId);
 
     let senderName = (data.name || 'Passenger').slice(0, 24);
@@ -1828,11 +1871,15 @@ function initLiveSessionsAndChat() {
     }
 
     const isMe = data.session === mySessionId;
-    const isVerified = (data.isAdmin === true && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH)) ||
-                       (senderName === 'Admin' && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH));
+    const isVerified = Boolean(
+      (data.isAdmin === true && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH)) ||
+      (senderName.toLowerCase() === 'admin' && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH || data.isAdmin === true)) ||
+      (isMe && isAdminVerified)
+    );
 
-    // If an unauthorized person tried to name themselves Admin, show them as Passenger
-    if (senderName.toLowerCase() === 'admin' && !isVerified) {
+    if (isVerified) {
+      senderName = 'Admin';
+    } else if (senderName.toLowerCase() === 'admin') {
       senderName = 'Passenger';
     }
 
@@ -1843,17 +1890,27 @@ function initLiveSessionsAndChat() {
     const timeStr = formatChatTime(data.timestamp);
 
     const senderHtml = isVerified
-      ? `${escapeHtml(senderName)} ${VERIFIED_TICK_SVG}`
-      : escapeHtml(senderName);
+      ? `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${VERIFIED_TICK_SVG}`
+      : `<span class="chat-sender-name">${escapeHtml(senderName)}</span>`;
 
     const msgEl = document.createElement('div');
-    msgEl.className = `chat-msg ${isMe ? 'is-me' : ''}`;
+    msgEl.className = `chat-msg ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''}`;
     msgEl.dataset.id = msgId;
 
     msgEl.innerHTML = `
       <div class="chat-msg-header">
         <span class="chat-msg-sender" style="color: ${tagColor};">${senderHtml}</span>
-        <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
+        <div class="chat-msg-header-right">
+          <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
+          <div class="chat-admin-actions">
+            <button type="button" class="chat-admin-action-btn chat-pin-btn" data-id="${escapeHtml(msgId)}" title="Pin message" aria-label="Pin message">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/></svg>
+            </button>
+            <button type="button" class="chat-admin-action-btn chat-delete-btn" data-id="${escapeHtml(msgId)}" title="Delete message" aria-label="Delete message">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-6 5v6m4-6v6"/></svg>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="chat-msg-text">${escapeHtml(text)}</div>
     `;
@@ -1868,16 +1925,93 @@ function initLiveSessionsAndChat() {
       chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
     }
 
-    if (!isChatOpen() && !isMe) {
-      if (chatUnreadDot) {
-        chatUnreadDot.hidden = false;
-      }
-    }
-
     // Trigger 2-second popping message on top of the song slider for live messages!
     if (isLive) {
       triggerSongPoppingMessage(senderName, text, tagColor, isVerified);
     }
+  }
+
+  if (chatMessagesContainer) {
+    chatMessagesContainer.addEventListener('click', (e) => {
+      const deleteBtn = e.target.closest('.chat-delete-btn');
+      if (deleteBtn) {
+        const msgId = deleteBtn.getAttribute('data-id');
+        if (!isAdminVerified) {
+          notify('Admin authorization required.');
+          return;
+        }
+        if (confirm('Delete this message for everyone?')) {
+          if (typeof deleteChatMessageFn === 'function') {
+            deleteChatMessageFn(msgId)
+              .then(() => {
+                if (currentPinnedMessage && currentPinnedMessage.id === msgId && typeof unpinChatMessageFn === 'function') {
+                  unpinChatMessageFn();
+                }
+                notify('Message deleted.');
+              })
+              .catch(() => notify('Failed to delete message.'));
+          }
+        }
+        return;
+      }
+
+      const pinBtn = e.target.closest('.chat-pin-btn');
+      if (pinBtn) {
+        const msgId = pinBtn.getAttribute('data-id');
+        if (!isAdminVerified) {
+          notify('Admin authorization required.');
+          return;
+        }
+        const msgEl = pinBtn.closest('.chat-msg');
+        if (!msgEl) return;
+        const senderName = msgEl.querySelector('.chat-sender-name')?.textContent || 'Passenger';
+        const text = msgEl.querySelector('.chat-msg-text')?.textContent || '';
+        const isVerifiedSender = Boolean(msgEl.querySelector('.verified-tick-icon'));
+
+        if (currentPinnedMessage && currentPinnedMessage.id === msgId) {
+          if (typeof unpinChatMessageFn === 'function') {
+            unpinChatMessageFn()
+              .then(() => notify('Message unpinned.'))
+              .catch(() => notify('Failed to unpin message.'));
+          }
+          return;
+        }
+
+        if (typeof pinChatMessageFn === 'function') {
+          pinChatMessageFn(msgId, senderName, text, isVerifiedSender)
+            .then(() => notify('Message pinned to top!'))
+            .catch(() => notify('Failed to pin message.'));
+        }
+      }
+    });
+  }
+
+  const chatUnpinBtn = $('chat-unpin-btn');
+  if (chatUnpinBtn) {
+    chatUnpinBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!isAdminVerified) return;
+      if (typeof unpinChatMessageFn === 'function') {
+        unpinChatMessageFn()
+          .then(() => notify('Message unpinned.'))
+          .catch(() => notify('Failed to unpin message.'));
+      }
+    });
+  }
+
+  const chatPinnedCard = $('chat-pinned-card');
+  if (chatPinnedCard) {
+    chatPinnedCard.addEventListener('click', (e) => {
+      if (e.target.closest('#chat-unpin-btn')) return;
+      if (currentPinnedMessage && currentPinnedMessage.id && chatMessagesContainer) {
+        const target = chatMessagesContainer.querySelector(`.chat-msg[data-id="${currentPinnedMessage.id}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.classList.add('is-highlighted');
+          setTimeout(() => target.classList.remove('is-highlighted'), 1400);
+        }
+      }
+    });
   }
 
   // --- Global Firebase Realtime Database Presence & Chat Layer ---
@@ -1885,7 +2019,7 @@ function initLiveSessionsAndChat() {
     Promise.all([
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js')
-    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, onDisconnect, serverTimestamp, query, limitToLast, onChildAdded }]) => {
+    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, remove, onDisconnect, serverTimestamp, query, limitToLast, onChildAdded, onChildRemoved }]) => {
       const app = initializeApp(firebaseConfig);
       const db = getDatabase(app);
 
@@ -1937,16 +2071,68 @@ function initLiveSessionsAndChat() {
       let isInitialChatHistoryLoaded = false;
 
       onChildAdded(recentMessagesQuery, (snapshot) => {
+        if (snapshot.key === '_pinned') return;
         const val = snapshot.val();
         if (val && typeof val === 'object') {
           appendChatMessage(snapshot.key, val, isInitialChatHistoryLoaded);
         }
       });
 
+      onChildRemoved(recentMessagesQuery, (snapshot) => {
+        if (snapshot.key === '_pinned') {
+          renderPinnedCard(null);
+          return;
+        }
+        if (!chatMessagesContainer) return;
+        const msgEl = chatMessagesContainer.querySelector(`.chat-msg[data-id="${snapshot.key}"]`);
+        if (msgEl) {
+          msgEl.style.opacity = '0';
+          msgEl.style.transform = 'scale(0.92)';
+          setTimeout(() => {
+            msgEl.remove();
+            seenMessageIds.delete(snapshot.key);
+            if (chatMessagesContainer.querySelectorAll('.chat-msg').length === 0 && chatEmptyState) {
+              chatEmptyState.style.display = 'block';
+            }
+          }, 200);
+        }
+        if (currentPinnedMessage && currentPinnedMessage.id === snapshot.key) {
+          renderPinnedCard(null);
+        }
+      });
+
+      const pinnedRef = ref(db, 'messages/_pinned');
+      onValue(pinnedRef, (snapshot) => {
+        renderPinnedCard(snapshot.val());
+      });
+
       // Enable live popping on top of song after initial chat backlog finishes loading
       setTimeout(() => {
         isInitialChatHistoryLoaded = true;
       }, 1200);
+
+      deleteChatMessageFn = (msgId) => {
+        const p = remove(ref(db, `messages/${msgId}`));
+        if (currentPinnedMessage && currentPinnedMessage.id === msgId) {
+          remove(ref(db, 'messages/_pinned')).catch(() => {});
+        }
+        return p;
+      };
+
+      pinChatMessageFn = (msgId, name, text, isVerified) => {
+        return set(ref(db, 'messages/_pinned'), {
+          id: msgId,
+          name: name,
+          text: text,
+          isVerified: Boolean(isVerified),
+          timestamp: serverTimestamp(),
+          adminToken: ADMIN_PASSKEY_HASH
+        });
+      };
+
+      unpinChatMessageFn = () => {
+        return remove(ref(db, 'messages/_pinned'));
+      };
 
       sendChatMessageFn = (name, text, isSenderAdmin = false) => {
         const payload = {
