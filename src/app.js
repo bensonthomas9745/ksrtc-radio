@@ -1350,12 +1350,84 @@ const chatForm = $('chat-form');
 const chatMessageInput = $('chat-message-input');
 const chatSendBtn = $('chat-send-btn');
 const chatUnreadDot = $('chat-unread-dot');
+const chatPopBubble = $('chat-pop-bubble');
+const chatPopSender = $('chat-pop-sender');
+const chatPopText = $('chat-pop-text');
 
 let chatDrawerCloseTimer = null;
 let lastChatMessageTime = 0;
 let isChatConnected = false;
 let sendChatMessageFn = null;
+let popBubbleTimer = null;
+let popBubbleFadeTimer = null;
 const CHAT_USERNAME_KEY = 'ksrtc_chat_passenger_name';
+
+// Curated vibrant, high-contrast palette for passenger name tags
+const PASSENGER_COLORS = [
+  '#38bdf8', // Sky Blue
+  '#f472b6', // Coral Rose
+  '#fbbf24', // Warm Amber Gold
+  '#a78bfa', // Lavender Violet
+  '#34d399', // Emerald Mint
+  '#fb923c', // Tangerine Orange
+  '#22d3ee', // Cyan
+  '#f87171', // Coral Red
+  '#e879f9', // Orchid Pink
+  '#4ade80', // Lime
+  '#facc15', // Sunflower Yellow
+  '#60a5fa', // Cornflower Blue
+  '#c084fc', // Bright Purple
+  '#2dd4bf', // Teal
+  '#fda4af', // Blossom Peach
+  '#818cf8', // Indigo
+];
+
+function getPassengerColor(name) {
+  if (!name || typeof name !== 'string') return PASSENGER_COLORS[0];
+  let hash = 0;
+  const clean = name.trim().toLowerCase();
+  for (let i = 0; i < clean.length; i++) {
+    hash = ((hash << 5) - hash) + clean.charCodeAt(i);
+    hash |= 0;
+  }
+  return PASSENGER_COLORS[Math.abs(hash) % PASSENGER_COLORS.length];
+}
+
+/* ==========================================================================
+   Popping Passenger Chat Message (Floats on top of the song for 2 seconds)
+   ========================================================================== */
+function triggerSongPoppingMessage(senderName, text, color) {
+  if (!chatPopBubble || !chatPopSender || !chatPopText) return;
+
+  clearTimeout(popBubbleTimer);
+  clearTimeout(popBubbleFadeTimer);
+
+  chatPopSender.textContent = senderName;
+  chatPopSender.style.color = color;
+  chatPopText.textContent = text;
+
+  chatPopBubble.classList.remove('is-leaving');
+  chatPopBubble.hidden = false;
+  void chatPopBubble.offsetWidth; // Force layout recalculation for fresh CSS animation
+  chatPopBubble.classList.add('is-popping');
+
+  // Pop message disappears after exactly 2 seconds
+  popBubbleTimer = setTimeout(() => {
+    chatPopBubble.classList.add('is-leaving');
+    chatPopBubble.classList.remove('is-popping');
+
+    popBubbleFadeTimer = setTimeout(() => {
+      chatPopBubble.hidden = true;
+      chatPopBubble.classList.remove('is-leaving');
+    }, 260);
+  }, 2000);
+}
+
+if (chatPopBubble) {
+  chatPopBubble.addEventListener('click', () => {
+    openChatDrawer();
+  });
+}
 
 function isChatOpen() {
   return Boolean(chatDrawerWrap && chatDrawerWrap.classList.contains('is-open'));
@@ -1437,6 +1509,7 @@ let currentChatUsername = getStoredOrRandomUsername();
 
 if (chatUsernameInput) {
   chatUsernameInput.value = currentChatUsername;
+  chatUsernameInput.style.color = getPassengerColor(currentChatUsername);
 
   chatUsernameInput.addEventListener('input', (e) => {
     let val = e.target.value.trim().slice(0, 24);
@@ -1444,6 +1517,7 @@ if (chatUsernameInput) {
       val = 'Passenger';
     }
     currentChatUsername = val;
+    chatUsernameInput.style.color = getPassengerColor(currentChatUsername);
     try {
       localStorage.setItem(CHAT_USERNAME_KEY, currentChatUsername);
     } catch (err) {}
@@ -1452,6 +1526,7 @@ if (chatUsernameInput) {
   chatUsernameInput.addEventListener('blur', () => {
     if (!chatUsernameInput.value.trim()) {
       chatUsernameInput.value = currentChatUsername;
+      chatUsernameInput.style.color = getPassengerColor(currentChatUsername);
     }
   });
 }
@@ -1633,7 +1708,7 @@ function initLiveSessionsAndChat() {
     }
   }
 
-  function appendChatMessage(msgId, data) {
+  function appendChatMessage(msgId, data, isLive = false) {
     if (!chatMessagesContainer || seenMessageIds.has(msgId)) return;
     seenMessageIds.add(msgId);
 
@@ -1646,6 +1721,7 @@ function initLiveSessionsAndChat() {
     const text = (data.text || '').trim();
     if (!text) return;
 
+    const tagColor = isMe ? '#34d399' : getPassengerColor(senderName);
     const timeStr = formatChatTime(data.timestamp);
 
     const msgEl = document.createElement('div');
@@ -1654,7 +1730,10 @@ function initLiveSessionsAndChat() {
 
     msgEl.innerHTML = `
       <div class="chat-msg-header">
-        <span class="chat-msg-sender">${escapeHtml(senderName)}</span>
+        <span class="chat-msg-sender" style="color:${tagColor}; border-color:${tagColor}38; background:${tagColor}12;">
+          <span class="chat-msg-sender-dot" style="background:${tagColor}; box-shadow:0 0 6px ${tagColor}"></span>
+          ${escapeHtml(senderName)}
+        </span>
         <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
       </div>
       <div class="chat-msg-text">${escapeHtml(text)}</div>
@@ -1674,6 +1753,11 @@ function initLiveSessionsAndChat() {
       if (chatUnreadDot) {
         chatUnreadDot.hidden = false;
       }
+    }
+
+    // Trigger 2-second popping message on top of the song for live messages!
+    if (isLive) {
+      triggerSongPoppingMessage(senderName, text, tagColor);
     }
   }
 
@@ -1731,13 +1815,19 @@ function initLiveSessionsAndChat() {
       // Live Passenger Chat
       const messagesRef = ref(db, 'messages');
       const recentMessagesQuery = query(messagesRef, limitToLast(60));
+      let isInitialChatHistoryLoaded = false;
 
       onChildAdded(recentMessagesQuery, (snapshot) => {
         const val = snapshot.val();
         if (val && typeof val === 'object') {
-          appendChatMessage(snapshot.key, val);
+          appendChatMessage(snapshot.key, val, isInitialChatHistoryLoaded);
         }
       });
+
+      // Enable live popping on top of song after initial chat backlog finishes loading
+      setTimeout(() => {
+        isInitialChatHistoryLoaded = true;
+      }, 1200);
 
       sendChatMessageFn = (name, text) => {
         return push(messagesRef, {

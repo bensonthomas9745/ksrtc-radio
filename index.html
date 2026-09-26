@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=31" />
+    <link rel="stylesheet" href="./src/styles.css?v=32" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -207,6 +207,16 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </section>
 
       <section class="player" id="player" aria-label="Music player" hidden>
+        <!-- Real-time popping passenger chat bubble for 2 seconds on top of the song -->
+        <div id="chat-pop-bubble" class="chat-pop-bubble" hidden aria-live="polite" title="Open Passenger Chat">
+          <div class="chat-pop-bubble-inner">
+            <span class="chat-pop-icon" aria-hidden="true">💬</span>
+            <span class="chat-pop-sender" id="chat-pop-sender">Passenger</span>
+            <span class="chat-pop-sep">:</span>
+            <span class="chat-pop-text" id="chat-pop-text">Welcome!</span>
+          </div>
+        </div>
+
         <div class="now-playing">
           <div class="album-art">
             <img id="album-art" src="https://img.youtube.com/vi/IL4H0erw0Bk/hqdefault.jpg" alt="Current playing song album art" />
@@ -394,6 +404,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=31"></script>
+    <script type="module" src="./src/app.js?v=32"></script>
   </body>
 </html>
