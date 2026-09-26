@@ -1921,6 +1921,18 @@ function initLiveSessionsAndChat() {
 
     chatMessagesContainer.appendChild(msgEl);
 
+    // Enforce keeping only the last 10 messages in the chatbox
+    const allMsgs = chatMessagesContainer.querySelectorAll('.chat-msg');
+    if (allMsgs.length > 10) {
+      for (let i = 0; i < allMsgs.length - 10; i++) {
+        const oldMsg = allMsgs[i];
+        if (oldMsg && oldMsg.dataset.id) {
+          seenMessageIds.delete(oldMsg.dataset.id);
+        }
+        oldMsg.remove();
+      }
+    }
+
     if (isMe || isScrolledToBottom || isChatOpen()) {
       chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
     }
@@ -2019,7 +2031,7 @@ function initLiveSessionsAndChat() {
     Promise.all([
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js')
-    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, remove, onDisconnect, serverTimestamp, query, limitToLast, onChildAdded, onChildRemoved }]) => {
+    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, remove, get, onDisconnect, serverTimestamp, query, limitToLast, onChildAdded, onChildRemoved }]) => {
       const app = initializeApp(firebaseConfig);
       const db = getDatabase(app);
 
@@ -2065,10 +2077,29 @@ function initLiveSessionsAndChat() {
         }
       });
 
-      // Live Passenger Chat
+      // Live Passenger Chat (strictly last 10 messages)
       const messagesRef = ref(db, 'messages');
-      const recentMessagesQuery = query(messagesRef, limitToLast(60));
+      const recentMessagesQuery = query(messagesRef, limitToLast(10));
       let isInitialChatHistoryLoaded = false;
+
+      function autoPruneOldMessages() {
+        get(messagesRef).then((snap) => {
+          const val = snap.val();
+          if (!val || typeof val !== 'object') return;
+          const keys = Object.keys(val).filter(k => k !== '_pinned');
+          if (keys.length > 10) {
+            keys.sort((a, b) => {
+              const tA = (val[a] && val[a].timestamp) || 0;
+              const tB = (val[b] && val[b].timestamp) || 0;
+              return tA - tB;
+            });
+            const toDelete = keys.slice(0, keys.length - 10);
+            toDelete.forEach((oldId) => {
+              remove(ref(db, `messages/${oldId}`)).catch(() => {});
+            });
+          }
+        }).catch(() => {});
+      }
 
       onChildAdded(recentMessagesQuery, (snapshot) => {
         if (snapshot.key === '_pinned') return;
@@ -2109,6 +2140,7 @@ function initLiveSessionsAndChat() {
       // Enable live popping on top of song after initial chat backlog finishes loading
       setTimeout(() => {
         isInitialChatHistoryLoaded = true;
+        autoPruneOldMessages();
       }, 1200);
 
       deleteChatMessageFn = (msgId) => {
@@ -2146,7 +2178,10 @@ function initLiveSessionsAndChat() {
           payload.isAdmin = true;
           payload.adminToken = ADMIN_PASSKEY_HASH;
         }
-        return push(messagesRef, payload);
+        return push(messagesRef, payload).then((res) => {
+          autoPruneOldMessages();
+          return res;
+        });
       };
 
       isChatConnected = true;
