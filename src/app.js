@@ -157,6 +157,7 @@ const preloadStatus = {
 };
 let hasFinished = false;
 let hasTriggeredEarlySong = false;
+let userExplicitlyPaused = false;
 
 function checkAllLoadedAndFinish() {
   if (!state.isJourneyStarted || hasFinished) return;
@@ -404,6 +405,7 @@ function setTrack(index, shouldPlay = true) {
     if (ytPlayer.unMute) ytPlayer.unMute();
     if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
     if (shouldPlay) {
+      userExplicitlyPaused = false;
       state.isPlaying = true;
       els.play.classList.add('is-playing');
       els.play.setAttribute('aria-label', 'Pause');
@@ -428,6 +430,7 @@ function setTrack(index, shouldPlay = true) {
 }
 
 function playMusic() {
+  userExplicitlyPaused = false;
   state.isPlaying = true;
   els.play.classList.add('is-playing');
   els.play.setAttribute('aria-label', 'Pause');
@@ -825,6 +828,12 @@ function resetJourney() {
   if (loadingStatus) {
     loadingStatus.textContent = 'Starting your ride in 8 seconds…';
   }
+  userExplicitlyPaused = false;
+  hasFirstTouchUnlocked = false;
+  cleanupUnlockListeners();
+  window.addEventListener('pointerdown', unlockAudioOnFirstTouch, { passive: true });
+  window.addEventListener('touchstart', unlockAudioOnFirstTouch, { passive: true });
+  window.addEventListener('click', unlockAudioOnFirstTouch, { passive: true });
 }
 
 // Track seek & progress polling from YouTube player
@@ -889,10 +898,13 @@ els.replay.addEventListener('click', () => {
   window.location.reload();
 });
 els.previous.addEventListener('click', () => setTrack(state.currentSongIndex - 1, true));
-els.play.addEventListener('click', () => {
+els.play.addEventListener('click', (e) => {
+  e.stopPropagation();
   if (state.isPlaying) {
+    userExplicitlyPaused = true;
     pauseMusic();
   } else {
+    userExplicitlyPaused = false;
     playMusic();
     if (isInstagramOrInApp) {
       setTimeout(() => {
@@ -961,15 +973,40 @@ document.addEventListener('keydown', (e) => {
   if (e.target.matches('input')) return;
   if (e.code === 'Space') {
     e.preventDefault();
-    state.isPlaying ? pauseMusic() : playMusic();
+    if (state.isPlaying) {
+      userExplicitlyPaused = true;
+      pauseMusic();
+    } else {
+      userExplicitlyPaused = false;
+      playMusic();
+    }
   }
   if (e.key === 'ArrowRight') setTrack(state.currentSongIndex + 1, true);
   if (e.key === 'ArrowLeft') setTrack(state.currentSongIndex - 1, true);
 });
 
+let hasFirstTouchUnlocked = false;
+
+function cleanupUnlockListeners() {
+  window.removeEventListener('pointerdown', unlockAudioOnFirstTouch);
+  window.removeEventListener('touchstart', unlockAudioOnFirstTouch);
+  window.removeEventListener('click', unlockAudioOnFirstTouch);
+}
+
 // Auto-unlock and unmute music on user interaction only AFTER the loading screen has finished
-const unlockAudioOnFirstTouch = () => {
-  if (!hasFinished || !state.isJourneyStarted) return;
+const unlockAudioOnFirstTouch = (e) => {
+  if (!hasFinished || !state.isJourneyStarted || hasFirstTouchUnlocked) return;
+
+  // If user interacted with controls directly, let that control manage playback
+  if (e && e.target && e.target.closest('button, input, a, .playlist-item')) {
+    hasFirstTouchUnlocked = true;
+    cleanupUnlockListeners();
+    return;
+  }
+
+  hasFirstTouchUnlocked = true;
+  cleanupUnlockListeners();
+
   if (ytPlayer && ytReady) {
     try {
       if (ytPlayer.isMuted && ytPlayer.isMuted()) {
@@ -980,7 +1017,7 @@ const unlockAudioOnFirstTouch = () => {
       }
     } catch (e) {}
   }
-  if (!state.isPlaying && ytPlayer && ytReady) {
+  if (!userExplicitlyPaused && !state.isPlaying && ytPlayer && ytReady) {
     playMusic();
   }
 };
@@ -1288,5 +1325,182 @@ if (els.fullscreenBtn) {
   document.addEventListener(evt, updateFullscreenUI);
 });
 updateFullscreenUI();
+
+/* ==========================================================================
+   Live Sessions Indicator (Website Real-Time Session Tracker)
+   Tracks active sessions open on the website across tabs and peer connections.
+   ========================================================================== */
+function initLiveSessionsTracker() {
+  const liveCountEl = $('live-count');
+  if (!liveCountEl) return;
+
+  const STORAGE_KEY = 'ksrtc_live_sessions_v1';
+  const HEARTBEAT_INTERVAL = 2500;
+  const SESSION_TTL = 7000;
+  const mySessionId = 's_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDQFHMh1WXH7er-Q-L-hrQ2hEilqOuL5LA",
+    authDomain: "ksrtc-radio.firebaseapp.com",
+    databaseURL: "https://ksrtc-radio-default-rtdb.firebaseio.com",
+    projectId: "ksrtc-radio",
+    storageBucket: "ksrtc-radio.firebasestorage.app",
+    messagingSenderId: "995559480361",
+    appId: "1:995559480361:web:dbc1fd761f1f9637691038"
+  };
+
+  let isFirebaseActive = false;
+
+  const channel = typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel('ksrtc_live_presence')
+    : null;
+
+  function updateBadge(count) {
+    const finalCount = Math.max(1, count);
+    if (liveCountEl.textContent !== String(finalCount)) {
+      liveCountEl.textContent = String(finalCount);
+    }
+  }
+
+  // --- Local Fallback Layer (Instant cross-tab updates on same browser) ---
+  function getLocalSessions() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      const data = JSON.parse(raw);
+      return typeof data === 'object' && data !== null ? data : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveLocalSessions(sessions) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    } catch (e) {}
+  }
+
+  function pruneAndHeartbeat() {
+    if (isFirebaseActive) return;
+    const now = Date.now();
+    const sessions = getLocalSessions();
+    let changed = false;
+
+    for (const [id, ts] of Object.entries(sessions)) {
+      if (typeof ts !== 'number' || now - ts > SESSION_TTL) {
+        delete sessions[id];
+        changed = true;
+      }
+    }
+
+    if (sessions[mySessionId] !== now) {
+      sessions[mySessionId] = now;
+      changed = true;
+    }
+
+    if (changed) {
+      saveLocalSessions(sessions);
+    }
+
+    const activeIds = Object.keys(sessions).filter(id => {
+      const ts = sessions[id];
+      return typeof ts === 'number' && now - ts <= SESSION_TTL;
+    });
+
+    updateBadge(activeIds.length);
+  }
+
+  function removeLocalSession() {
+    try {
+      const sessions = getLocalSessions();
+      if (sessions[mySessionId]) {
+        delete sessions[mySessionId];
+        saveLocalSessions(sessions);
+      }
+      if (channel) {
+        channel.postMessage({ type: 'leave', id: mySessionId });
+      }
+    } catch (e) {}
+  }
+
+  pruneAndHeartbeat();
+  setInterval(pruneAndHeartbeat, HEARTBEAT_INTERVAL);
+
+  if (channel) {
+    channel.onmessage = (event) => {
+      if (isFirebaseActive) return;
+      const data = event.data;
+      if (data && (data.type === 'join' || data.type === 'leave' || data.type === 'ping')) {
+        pruneAndHeartbeat();
+      }
+    };
+    channel.postMessage({ type: 'join', id: mySessionId });
+  }
+
+  window.addEventListener('storage', (e) => {
+    if (!isFirebaseActive && e.key === STORAGE_KEY) {
+      pruneAndHeartbeat();
+    }
+  });
+
+  window.addEventListener('beforeunload', removeLocalSession);
+  window.addEventListener('pagehide', removeLocalSession);
+
+  // --- Global Firebase Realtime Database Presence Layer ---
+  try {
+    Promise.all([
+      import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js')
+    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, onDisconnect, serverTimestamp }]) => {
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+      const presenceListRef = ref(db, 'presence');
+      const connectedRef = ref(db, '.info/connected');
+
+      let myPresenceRef = null;
+
+      onValue(connectedRef, (snap) => {
+        if (snap.val() === true) {
+          isFirebaseActive = true;
+          myPresenceRef = push(presenceListRef);
+
+          // When connection drops / tab closes, automatically remove this tab from Firebase
+          onDisconnect(myPresenceRef).remove();
+
+          // Register this active session in Firebase
+          set(myPresenceRef, {
+            joinedAt: serverTimestamp(),
+            session: mySessionId
+          });
+        }
+      });
+
+      // Real-time listener: triggers whenever anyone joins or leaves anywhere in the world
+      onValue(presenceListRef, (snap) => {
+        isFirebaseActive = true;
+        const data = snap.val();
+        const count = data ? Object.keys(data).length : 1;
+        updateBadge(count);
+      });
+
+      // Clean up on explicit page unload
+      window.addEventListener('beforeunload', () => {
+        if (myPresenceRef) {
+          try { set(myPresenceRef, null); } catch (e) {}
+        }
+      });
+      window.addEventListener('pagehide', () => {
+        if (myPresenceRef) {
+          try { set(myPresenceRef, null); } catch (e) {}
+        }
+      });
+    }).catch((err) => {
+      console.warn('Firebase live presence fallback to local session tracker:', err);
+    });
+  } catch (err) {}
+}
+
+initLiveSessionsTracker();
+
 
 
