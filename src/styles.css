@@ -1008,6 +1008,45 @@ button { color:inherit; cursor:pointer; }
   background: rgba(255, 255, 255, 0.11);
 }
 
+.chat-gender-selector {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+  padding: 2px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.chat-gender-pill {
+  width: 22px;
+  height: 22px;
+  border-radius: 99px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all .15s ease;
+  padding: 0;
+}
+.chat-gender-pill:hover {
+  color: #fff;
+}
+.chat-gender-pill.is-active[data-gender="M"] {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.55);
+}
+.chat-gender-pill.is-active[data-gender="F"] {
+  background: #ec4899;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.55);
+}
+
 .chat-messages-container {
   flex: 1;
   overflow-y: auto;
@@ -1247,6 +1286,30 @@ button { color:inherit; cursor:pointer; }
   height: 13.5px;
   fill: #38bdf8;
   filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.6));
+}
+
+.chat-gender-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 1.5px 4.5px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.chat-gender-tag.gender-m {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+.chat-gender-tag.gender-f {
+  background: rgba(236, 72, 153, 0.2);
+  color: #f472b6;
+  border: 1px solid rgba(236, 72, 153, 0.4);
 }
 
 .chat-msg-header-right {

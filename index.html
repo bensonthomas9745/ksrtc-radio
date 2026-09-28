@@ -383,7 +383,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           </header>
 
           <div class="chat-user-bar">
-            <label for="chat-username-input" class="chat-user-label">Your Name:</label>
+            <label for="chat-username-input" class="chat-user-label">Name:</label>
             <div class="chat-username-field-wrap">
               <input type="text" id="chat-username-input" class="chat-username-input" placeholder="e.g. Passenger #24" maxlength="24" autocomplete="off" />
               <span class="chat-verified-badge" id="chat-verified-badge" title="Verified Station Admin" hidden aria-label="Verified Station Admin">
@@ -391,6 +391,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                   <path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/>
                 </svg>
               </span>
+            </div>
+            <div class="chat-gender-selector" id="chat-gender-selector" role="radiogroup" aria-label="Gender selection">
+              <button type="button" class="chat-gender-pill is-active" id="chat-gender-m" data-gender="M" aria-label="Male" title="Male (M)">M</button>
+              <button type="button" class="chat-gender-pill" id="chat-gender-f" data-gender="F" aria-label="Female" title="Female (F)">F</button>
             </div>
           </div>
 
@@ -447,6 +451,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=37"></script>
+    <script type="module" src="./src/app.js?v=38"></script>
   </body>
 </html>

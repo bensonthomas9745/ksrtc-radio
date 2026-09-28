@@ -1365,6 +1365,37 @@ let currentPinnedMessage = null;
 let popBubbleTimer = null;
 let popBubbleFadeTimer = null;
 const CHAT_USERNAME_KEY = 'ksrtc_chat_passenger_name';
+const CHAT_GENDER_KEY = 'ksrtc_chat_passenger_gender';
+
+function getStoredOrRandomGender() {
+  try {
+    const saved = localStorage.getItem(CHAT_GENDER_KEY);
+    if (saved === 'M' || saved === 'F') return saved;
+  } catch (e) {}
+  const defaultGender = Math.random() > 0.5 ? 'M' : 'F';
+  try { localStorage.setItem(CHAT_GENDER_KEY, defaultGender); } catch (e) {}
+  return defaultGender;
+}
+
+let currentChatGender = getStoredOrRandomGender();
+
+function getPassengerGenderFallback(name) {
+  if (!name) return 'M';
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return (Math.abs(hash) % 2 === 0) ? 'M' : 'F';
+}
+
+function updateGenderUI() {
+  const mBtn = $('chat-gender-m');
+  const fBtn = $('chat-gender-f');
+  if (mBtn && fBtn) {
+    mBtn.classList.toggle('is-active', currentChatGender === 'M');
+    mBtn.setAttribute('aria-checked', String(currentChatGender === 'M'));
+    fBtn.classList.toggle('is-active', currentChatGender === 'F');
+    fBtn.setAttribute('aria-checked', String(currentChatGender === 'F'));
+  }
+}
 
 const ADMIN_PASSKEY_HASH = '4a1d5cc9d2ab47b32a1d81c93290bba7e549e7871f1e2babaa224b7ab2e6c946';
 const VERIFIED_TICK_SVG = `<span class="verified-tick-wrap" title="Verified Station Admin" aria-label="Verified Station Admin"><svg class="verified-tick-icon" viewBox="0 0 24 24" width="14" height="14" fill="#38bdf8" aria-hidden="true"><path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/></svg></span>`;
@@ -1438,17 +1469,21 @@ function getPassengerColor(name) {
 /* ==========================================================================
    Apple-Style Pop-up Message Balloon (Floats on top of the song slider)
    ========================================================================== */
-function triggerSongPoppingMessage(senderName, text, color, isVerified = false) {
+function triggerSongPoppingMessage(senderName, text, color, isVerified = false, gender = '') {
   if (!chatPopBubble || !chatPopSender || !chatPopText) return;
   if (!senderName || senderName.toLowerCase() === 'system') return;
 
   clearTimeout(popBubbleTimer);
   clearTimeout(popBubbleFadeTimer);
 
+  const genderHtml = (gender === 'M' || gender === 'F')
+    ? ` <span class="chat-gender-tag gender-${gender.toLowerCase()}">${gender}</span>`
+    : '';
+
   if (isVerified) {
-    chatPopSender.innerHTML = `${escapeHtml(senderName)} ${VERIFIED_TICK_SVG}`;
+    chatPopSender.innerHTML = `<span class="chat-sender-name">${escapeHtml(senderName)}</span>${genderHtml} ${VERIFIED_TICK_SVG}`;
   } else {
-    chatPopSender.textContent = senderName;
+    chatPopSender.innerHTML = `<span class="chat-sender-name">${escapeHtml(senderName)}</span>${genderHtml}`;
   }
   chatPopSender.style.color = color;
   chatPopText.textContent = text;
@@ -1640,6 +1675,21 @@ if (chatUsernameInput) {
   });
 }
 
+const genderSelector = $('chat-gender-selector');
+if (genderSelector) {
+  genderSelector.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chat-gender-pill');
+    if (!btn) return;
+    const g = btn.getAttribute('data-gender');
+    if (g === 'M' || g === 'F') {
+      currentChatGender = g;
+      try { localStorage.setItem(CHAT_GENDER_KEY, g); } catch (err) {}
+      updateGenderUI();
+    }
+  });
+}
+updateGenderUI();
+
 if (chatForm && chatMessageInput) {
   chatForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1674,7 +1724,7 @@ if (chatForm && chatMessageInput) {
 
     lastChatMessageTime = now;
 
-    sendChatMessageFn(activeName.slice(0, 24), text, isAdminVerified)
+    sendChatMessageFn(activeName.slice(0, 24), text, isAdminVerified, currentChatGender)
       .then(() => {
         chatMessageInput.value = '';
         if (chatSendBtn) chatSendBtn.disabled = false;
@@ -1839,11 +1889,15 @@ function initLiveSessionsAndChat() {
       (data.name && data.name.toLowerCase() === 'admin')
     );
     const color = isVerifiedSender ? '#38bdf8' : getPassengerColor(data.name);
+    const pinnedGender = (data.gender === 'M' || data.gender === 'F')
+      ? data.gender
+      : getPassengerGenderFallback(data.name);
+    const genderTag = `<span class="chat-gender-tag gender-${pinnedGender.toLowerCase()}" title="${pinnedGender === 'M' ? 'Male' : 'Female'}">${pinnedGender}</span>`;
 
     if (senderEl) {
       senderEl.innerHTML = isVerifiedSender
-        ? `${escapeHtml(data.name || 'Admin')} ${VERIFIED_TICK_SVG}`
-        : escapeHtml(data.name || 'Passenger');
+        ? `<span class="chat-sender-name">${escapeHtml(data.name || 'Admin')}</span> ${genderTag} ${VERIFIED_TICK_SVG}`
+        : `<span class="chat-sender-name">${escapeHtml(data.name || 'Passenger')}</span> ${genderTag}`;
       senderEl.style.color = color;
     }
     if (textEl) {
@@ -1889,9 +1943,15 @@ function initLiveSessionsAndChat() {
     const tagColor = isVerified ? '#38bdf8' : (isMe ? '#34d399' : getPassengerColor(senderName));
     const timeStr = formatChatTime(data.timestamp);
 
+    const gender = (data.gender === 'M' || data.gender === 'F')
+      ? data.gender
+      : (isMe ? currentChatGender : getPassengerGenderFallback(senderName));
+
+    const genderHtml = `<span class="chat-gender-tag gender-${gender.toLowerCase()}" title="${gender === 'M' ? 'Male' : 'Female'}">${escapeHtml(gender)}</span>`;
+
     const senderHtml = isVerified
-      ? `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${VERIFIED_TICK_SVG}`
-      : `<span class="chat-sender-name">${escapeHtml(senderName)}</span>`;
+      ? `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${genderHtml} ${VERIFIED_TICK_SVG}`
+      : `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${genderHtml}`;
 
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''}`;
@@ -1939,7 +1999,7 @@ function initLiveSessionsAndChat() {
 
     // Trigger 2-second popping message on top of the song slider for live messages!
     if (isLive) {
-      triggerSongPoppingMessage(senderName, text, tagColor, isVerified);
+      triggerSongPoppingMessage(senderName, text, tagColor, isVerified, gender);
     }
   }
 
@@ -1979,6 +2039,8 @@ function initLiveSessionsAndChat() {
         const senderName = msgEl.querySelector('.chat-sender-name')?.textContent || 'Passenger';
         const text = msgEl.querySelector('.chat-msg-text')?.textContent || '';
         const isVerifiedSender = Boolean(msgEl.querySelector('.verified-tick-icon'));
+        const genderEl = msgEl.querySelector('.chat-gender-tag');
+        const msgGender = genderEl ? (genderEl.textContent.trim() || 'M') : 'M';
 
         if (currentPinnedMessage && currentPinnedMessage.id === msgId) {
           if (typeof unpinChatMessageFn === 'function') {
@@ -1990,7 +2052,7 @@ function initLiveSessionsAndChat() {
         }
 
         if (typeof pinChatMessageFn === 'function') {
-          pinChatMessageFn(msgId, senderName, text, isVerifiedSender)
+          pinChatMessageFn(msgId, senderName, text, isVerifiedSender, msgGender)
             .then(() => notify('Message pinned to top!'))
             .catch(() => notify('Failed to pin message.'));
         }
@@ -2151,11 +2213,12 @@ function initLiveSessionsAndChat() {
         return p;
       };
 
-      pinChatMessageFn = (msgId, name, text, isVerified) => {
+      pinChatMessageFn = (msgId, name, text, isVerified, gender = 'M') => {
         return set(ref(db, 'messages/_pinned'), {
           id: msgId,
           name: name,
           text: text,
+          gender: gender || 'M',
           isVerified: Boolean(isVerified),
           timestamp: serverTimestamp(),
           adminToken: ADMIN_PASSKEY_HASH
@@ -2166,10 +2229,11 @@ function initLiveSessionsAndChat() {
         return remove(ref(db, 'messages/_pinned'));
       };
 
-      sendChatMessageFn = (name, text, isSenderAdmin = false) => {
+      sendChatMessageFn = (name, text, isSenderAdmin = false, gender = 'M') => {
         const payload = {
           name,
           text,
+          gender: gender || 'M',
           session: mySessionId,
           timestamp: serverTimestamp()
         };
