@@ -2815,38 +2815,175 @@ const PASSENGER_GIFS = [
   { id: 'g83', cat: 'reactions', title: 'Saluting Conductor', url: 'https://i.giphy.com/3o7TKs35s2D0H5rF5m.gif', tags: ['salute', 'respect', 'officer', 'captain', 'conductor'] }
 ];
 
+// ==========================================================================
+// GIPHY API Integration (Live Search + Curated Passenger Vault)
+// ==========================================================================
+const GIPHY_API_KEY = 'j6rD6rZA3y5enfNXfaDjLtfV6FT6OA78';
+const GIPHY_CACHE = new Map();
 let activeGifCategory = 'all';
+let gifSearchDebounceTimer = null;
+let activeGifSearchController = null;
 
-function renderGifGrid(filterText = '') {
-  if (!chatGifGrid) return;
-  const clean = filterText.trim().toLowerCase();
-  const filtered = PASSENGER_GIFS.filter((g) => {
-    const matchesCat = activeGifCategory === 'all' || g.cat === activeGifCategory;
-    if (!matchesCat) return false;
-    if (!clean) return true;
-    const tagMatch = Array.isArray(g.tags) && g.tags.some(t => t.toLowerCase().includes(clean));
-    return g.title.toLowerCase().includes(clean) || g.cat.toLowerCase().includes(clean) || tagMatch;
-  });
+const GIPHY_CAT_TERMS = {
+  bus: 'kerala bus aanavandi',
+  malayalam: 'malayalam comedy mohanlal',
+  comedy: 'comedy funny laugh meme',
+  music: 'music dance party beat',
+  rain: 'rain monsoon aesthetic',
+  love: 'love heart cute romance',
+  swag: 'swag mass attitude hero',
+  reactions: 'reaction thumbs up wow'
+};
 
-  if (chatGifCountBadge) {
-    chatGifCountBadge.textContent = `${filtered.length} GIFs`;
+function formatGiphyItem(item) {
+  const cleanTitle = (item.title || 'GIF')
+    .replace(/\s*GIF(\s*by\s*.*)?$/i, '')
+    .trim() || 'GIF';
+  return {
+    id: item.id,
+    cat: 'giphy',
+    title: cleanTitle,
+    url: `https://i.giphy.com/${item.id}.gif`,
+    thumb: item.images?.fixed_height_downsampled?.url || item.images?.fixed_height_small?.url || item.images?.fixed_height?.url || `https://i.giphy.com/${item.id}.gif`
+  };
+}
+
+async function fetchGiphySearch(query, limit = 26) {
+  const cacheKey = `search:${query.toLowerCase().trim()}:${limit}`;
+  if (GIPHY_CACHE.has(cacheKey)) {
+    return GIPHY_CACHE.get(cacheKey);
   }
 
-  if (filtered.length === 0) {
+  if (activeGifSearchController) {
+    activeGifSearchController.abort();
+  }
+  activeGifSearchController = new AbortController();
+
+  const url = `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=${limit}&rating=pg`;
+  const res = await fetch(url, { signal: activeGifSearchController.signal });
+  if (!res.ok) throw new Error(`GIPHY API HTTP ${res.status}`);
+  const json = await res.json();
+  const list = (json.data || []).map(formatGiphyItem);
+
+  if (GIPHY_CACHE.size > 60) {
+    const firstKey = GIPHY_CACHE.keys().next().value;
+    GIPHY_CACHE.delete(firstKey);
+  }
+  GIPHY_CACHE.set(cacheKey, list);
+  return list;
+}
+
+function renderGifItems(items, emptyMsg = '') {
+  if (!chatGifGrid) return;
+  if (!items || items.length === 0) {
     chatGifGrid.innerHTML = `
-      <div style="grid-column: span 2; text-align: center; padding: 24px 10px; color: #64748b; font-size: 12px;">
-        No GIFs found for "${escapeHtml(clean)}". Try another search or category!
+      <div style="grid-column: span 2; text-align: center; padding: 28px 10px; color: #64748b; font-size: 12px;">
+        ${escapeHtml(emptyMsg || 'No GIFs found. Try another search or category!')}
       </div>
     `;
+    if (chatGifCountBadge) chatGifCountBadge.textContent = '0 GIFs';
     return;
   }
 
-  chatGifGrid.innerHTML = filtered.map((g) => `
-    <div class="chat-gif-item" data-gif-url="${escapeHtml(g.url)}" data-gif-title="${escapeHtml(g.title)}" title="${escapeHtml(g.title)}">
-      <img src="${escapeHtml(g.url)}" alt="${escapeHtml(g.title)}" loading="lazy" referrerpolicy="no-referrer" />
-      <span class="chat-gif-item-title">${escapeHtml(g.title)}</span>
-    </div>
-  `).join('');
+  if (chatGifCountBadge) {
+    chatGifCountBadge.textContent = `${items.length} GIFs`;
+  }
+
+  chatGifGrid.innerHTML = items.map((g) => {
+    const displayThumb = g.thumb || g.url;
+    return `
+      <div class="chat-gif-item" data-gif-url="${escapeHtml(g.url)}" data-gif-title="${escapeHtml(g.title)}" title="${escapeHtml(g.title)}">
+        <img src="${escapeHtml(displayThumb)}" alt="${escapeHtml(g.title)}" loading="lazy" referrerpolicy="no-referrer" />
+        <span class="chat-gif-item-title">${escapeHtml(g.title)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+async function renderGifGrid(filterText = '') {
+  if (!chatGifGrid) return;
+  const clean = filterText.trim();
+  const lower = clean.toLowerCase();
+
+  // If query is empty
+  if (!clean) {
+    if (activeGifCategory === 'all') {
+      renderGifItems(PASSENGER_GIFS);
+      if (chatGifCountBadge) chatGifCountBadge.textContent = `${PASSENGER_GIFS.length} GIFs`;
+      return;
+    }
+
+    // Category selected with empty query:
+    const localMatches = PASSENGER_GIFS.filter(g => g.cat === activeGifCategory);
+    renderGifItems(localMatches);
+
+    // Fetch and append live GIPHY results for category term
+    const catTerm = GIPHY_CAT_TERMS[activeGifCategory];
+    if (catTerm) {
+      try {
+        const giphyResults = await fetchGiphySearch(catTerm, 20);
+        // Avoid duplicate IDs
+        const existingIds = new Set(localMatches.map(m => m.id));
+        const newFromGiphy = giphyResults.filter(g => !existingIds.has(g.id));
+        const combined = [...localMatches, ...newFromGiphy];
+        renderGifItems(combined);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // Keep showing local matches gracefully
+        }
+      }
+    }
+    return;
+  }
+
+  // User typed a search query:
+  // 1. Check local PASSENGER_GIFS first for instant response
+  const localMatches = PASSENGER_GIFS.filter((g) => {
+    const matchesCat = activeGifCategory === 'all' || g.cat === activeGifCategory;
+    if (!matchesCat) return false;
+    const tagMatch = Array.isArray(g.tags) && g.tags.some(t => t.toLowerCase().includes(lower));
+    return g.title.toLowerCase().includes(lower) || g.cat.toLowerCase().includes(lower) || tagMatch;
+  });
+
+  const cacheKey = `search:${lower}:26`;
+  if (GIPHY_CACHE.has(cacheKey)) {
+    const cachedGiphy = GIPHY_CACHE.get(cacheKey);
+    const existingIds = new Set(localMatches.map(m => m.id));
+    const merged = [...localMatches, ...cachedGiphy.filter(g => !existingIds.has(g.id))];
+    renderGifItems(merged, `No GIFs found for "${clean}". Try another keyword!`);
+    return;
+  }
+
+  // If no cache, show local matches immediately or a spinner if no local matches exist
+  if (localMatches.length > 0) {
+    renderGifItems(localMatches);
+    if (chatGifCountBadge) chatGifCountBadge.textContent = `${localMatches.length}+ GIFs`;
+  } else {
+    chatGifGrid.innerHTML = `
+      <div class="chat-gif-loading">
+        <div class="chat-gif-spinner"></div>
+        <span>Searching GIPHY for <strong>"${escapeHtml(clean)}"</strong>…</span>
+      </div>
+    `;
+    if (chatGifCountBadge) chatGifCountBadge.textContent = 'Searching…';
+  }
+
+  // Fetch live from Giphy API
+  try {
+    const giphyResults = await fetchGiphySearch(clean, 26);
+    const existingIds = new Set(localMatches.map(m => m.id));
+    const merged = [...localMatches, ...giphyResults.filter(g => !existingIds.has(g.id))];
+    renderGifItems(merged, `No GIFs found on GIPHY for "${clean}". Try another keyword!`);
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.warn('GIPHY live search failed, using local results:', err);
+      if (localMatches.length > 0) {
+        renderGifItems(localMatches);
+      } else {
+        renderGifItems([], `Unable to search GIPHY right now. Try another keyword!`);
+      }
+    }
+  }
 }
 
 const chatGifBtn = $('chat-gif-btn');
@@ -2891,7 +3028,10 @@ if (chatGifSearchInput) {
   chatGifSearchInput.addEventListener('input', () => {
     const val = chatGifSearchInput.value.trim();
     if (chatGifSearchClear) chatGifSearchClear.hidden = !val;
-    renderGifGrid(val);
+    clearTimeout(gifSearchDebounceTimer);
+    gifSearchDebounceTimer = setTimeout(() => {
+      renderGifGrid(chatGifSearchInput.value);
+    }, 280);
   });
 }
 
@@ -2899,6 +3039,7 @@ if (chatGifSearchClear && chatGifSearchInput) {
   chatGifSearchClear.addEventListener('click', () => {
     chatGifSearchInput.value = '';
     chatGifSearchClear.hidden = true;
+    clearTimeout(gifSearchDebounceTimer);
     renderGifGrid('');
     chatGifSearchInput.focus();
   });
