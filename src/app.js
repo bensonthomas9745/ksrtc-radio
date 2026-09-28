@@ -1598,6 +1598,12 @@ function openChatDrawer() {
     chatUnreadDot.hidden = false;
   }
 
+  const mainLive = $('live-count');
+  const chatLive = $('chat-live-count');
+  if (chatLive && mainLive && mainLive.textContent) {
+    chatLive.textContent = mainLive.textContent;
+  }
+
   if (chatMessagesContainer) {
     chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
   }
@@ -1871,6 +1877,7 @@ if (chatForm && chatMessageInput) {
    ========================================================================== */
 function initLiveSessionsAndChat() {
   const liveCountEl = $('live-count');
+  const chatLiveCountEl = $('chat-live-count');
   const STORAGE_KEY = 'ksrtc_live_sessions_v1';
   const HEARTBEAT_INTERVAL = 2500;
   const SESSION_TTL = 7000;
@@ -1893,10 +1900,12 @@ function initLiveSessionsAndChat() {
     : null;
 
   function updateBadge(count) {
-    if (!liveCountEl) return;
     const finalCount = Math.max(1, count);
-    if (liveCountEl.textContent !== String(finalCount)) {
+    if (liveCountEl && liveCountEl.textContent !== String(finalCount)) {
       liveCountEl.textContent = String(finalCount);
+    }
+    if (chatLiveCountEl && chatLiveCountEl.textContent !== String(finalCount)) {
+      chatLiveCountEl.textContent = String(finalCount);
     }
   }
 

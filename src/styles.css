@@ -1034,7 +1034,7 @@ button { color:inherit; cursor:pointer; }
 .chat-header-bg-art {
   position: absolute;
   inset: 0;
-  background: url('../assets/images/chat-header-scenic.jpg') no-repeat right center / cover;
+  background: url('../assets/images/chat-header-scenic.jpg?v=2') no-repeat right center / cover;
   pointer-events: none;
   z-index: 0;
 }
@@ -1090,6 +1090,10 @@ button { color:inherit; cursor:pointer; }
   color: #94a3b8;
   font-weight: 500;
   margin-top: 3px;
+}
+.chat-live-count {
+  font-weight: 700;
+  color: #f8fafc;
 }
 .chat-live-pulse-dot {
   width: 7px;
