@@ -2679,6 +2679,15 @@ if (chatAttachmentRemoveBtn) {
   chatAttachmentRemoveBtn.addEventListener('click', clearMediaAttachment);
 }
 
+const chatAttachmentPreviewBox = document.querySelector('.chat-attachment-preview-box');
+if (chatAttachmentPreviewBox) {
+  chatAttachmentPreviewBox.addEventListener('click', () => {
+    if (currentAttachment && currentAttachment.url) {
+      openChatLightbox(currentAttachment.url);
+    }
+  });
+}
+
 // Photo Upload Button & File Input
 const chatImgBtn = $('chat-img-btn');
 if (chatImgBtn && chatFileInput) {
@@ -2832,45 +2841,6 @@ async function loadGiphyGifs(query = '') {
   }
 }
 
-// Clicking a GIF immediately sends it as a GIF message in the chat
-async function sendGifDirectly(gifUrl, gifTitle) {
-  if (!gifUrl) return;
-
-  if (!isChatConnected || typeof sendChatMessageFn !== 'function') {
-    notify('Connecting to live passenger chat...');
-    return;
-  }
-
-  let activeName = (chatUsernameInput ? chatUsernameInput.value.trim() : '') || currentChatUsername || 'Passenger';
-  if (activeName.toLowerCase() === 'admin' && !isAdminVerified) {
-    activeName = 'Passenger';
-  }
-
-  const replyPayload = currentReplyTo ? {
-    id: currentReplyTo.id || '',
-    name: currentReplyTo.name || 'Passenger',
-    text: (currentReplyTo.text || '').slice(0, 80)
-  } : null;
-
-  const mediaPayload = {
-    type: 'gif',
-    url: gifUrl,
-    name: gifTitle || 'GIF'
-  };
-
-  try {
-    await sendChatMessageFn(activeName.slice(0, 24), '', isAdminVerified, currentChatGender, replyPayload, mediaPayload);
-    if (chatGifDrawer) chatGifDrawer.hidden = true;
-    clearReplyingTo();
-    if (chatMessagesContainer) {
-      chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-    }
-  } catch (err) {
-    console.warn('Failed to send GIF:', err);
-    notify('Unable to send GIF right now.');
-  }
-}
-
 const chatGifBtn = $('chat-gif-btn');
 if (chatGifBtn && chatGifDrawer) {
   chatGifBtn.addEventListener('click', (e) => {
@@ -2945,7 +2915,7 @@ if (chatGifGrid) {
     const url = item.getAttribute('data-gif-url');
     const title = item.getAttribute('data-gif-title') || 'GIF';
     if (url) {
-      sendGifDirectly(url, title);
+      setMediaAttachment('gif', url, title);
     }
   });
 }
@@ -3038,12 +3008,14 @@ function openChatLightbox(src) {
   if (!chatLightbox || !chatLightboxImg || !src) return;
   chatLightboxImg.src = src;
   chatLightbox.hidden = false;
+  try { document.body.style.overflow = 'hidden'; } catch (e) {}
 }
 
 function closeChatLightbox() {
   if (!chatLightbox) return;
   chatLightbox.hidden = true;
   if (chatLightboxImg) chatLightboxImg.src = '';
+  try { document.body.style.overflow = ''; } catch (e) {}
 }
 
 if (chatLightboxClose) {
@@ -3051,6 +3023,22 @@ if (chatLightboxClose) {
 }
 if (chatLightboxBackdrop) {
   chatLightboxBackdrop.addEventListener('click', closeChatLightbox);
+}
+if (chatLightbox) {
+  chatLightbox.addEventListener('click', (e) => {
+    if (e.target === chatLightbox || e.target === chatLightboxBackdrop) {
+      closeChatLightbox();
+    }
+  });
+}
+const chatLightboxDialog = document.querySelector('.chat-lightbox-dialog');
+if (chatLightboxDialog) {
+  chatLightboxDialog.addEventListener('click', (e) => {
+    // If the close button was clicked, let it bubble, otherwise don't close
+    if (!e.target.closest('#chat-lightbox-close')) {
+      e.stopPropagation();
+    }
+  });
 }
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {

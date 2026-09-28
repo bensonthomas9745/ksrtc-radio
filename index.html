@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=40" />
+    <link rel="stylesheet" href="./src/styles.css?v=41" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -577,17 +577,18 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           </form>
         </aside>
       </div>
-
-      <!-- Apple-Style Fullscreen Media Lightbox -->
-      <div id="chat-lightbox" class="chat-lightbox" hidden aria-modal="true" role="dialog" aria-label="Media Preview">
-        <div class="chat-lightbox-backdrop" id="chat-lightbox-backdrop"></div>
-        <div class="chat-lightbox-dialog">
-          <button type="button" class="chat-lightbox-close" id="chat-lightbox-close" aria-label="Close preview" title="Close">✕</button>
-          <img id="chat-lightbox-img" class="chat-lightbox-img" src="" alt="Enlarged media" referrerpolicy="no-referrer" />
-        </div>
-      </div>
     </main>
+
+    <!-- Apple-Style Fullscreen Media Lightbox (Frontest Layer) -->
+    <div id="chat-lightbox" class="chat-lightbox" hidden aria-modal="true" role="dialog" aria-label="Media Preview">
+      <div class="chat-lightbox-backdrop" id="chat-lightbox-backdrop"></div>
+      <div class="chat-lightbox-dialog">
+        <button type="button" class="chat-lightbox-close" id="chat-lightbox-close" aria-label="Close preview" title="Close">✕</button>
+        <img id="chat-lightbox-img" class="chat-lightbox-img" src="" alt="Enlarged media" referrerpolicy="no-referrer" />
+      </div>
+    </div>
+
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=48"></script>
+    <script type="module" src="./src/app.js?v=49"></script>
   </body>
 </html>

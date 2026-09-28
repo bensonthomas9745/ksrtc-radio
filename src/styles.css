@@ -2486,8 +2486,14 @@ button { color:inherit; cursor:pointer; }
   border-radius: 8px;
   overflow: hidden;
   background: #11141a;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   flex-shrink: 0;
+  cursor: pointer;
+  transition: transform .14s ease, border-color .14s ease;
+}
+.chat-attachment-preview-box:hover {
+  transform: scale(1.06);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 .chat-attachment-preview-box img {
   width: 100%;
@@ -2621,7 +2627,7 @@ button { color:inherit; cursor:pointer; }
 .chat-lightbox {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: 100100 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2681,11 +2687,31 @@ button { color:inherit; cursor:pointer; }
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   transition: transform .18s ease, background .18s ease;
-  z-index: 2;
+  z-index: 10;
+  -webkit-tap-highlight-color: transparent;
 }
 .chat-lightbox-close:hover {
   transform: scale(1.1);
-  background: rgba(244, 63, 94, 0.8);
+  background: rgba(244, 63, 94, 0.85);
+}
+@media (max-width: 640px) {
+  .chat-lightbox {
+    padding: 12px;
+  }
+  .chat-lightbox-dialog {
+    max-width: 96vw;
+    max-height: 88vh;
+  }
+  .chat-lightbox-img {
+    max-height: 84vh;
+  }
+  .chat-lightbox-close {
+    top: -12px;
+    right: -8px;
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+  }
 }
 
 /* ==========================================================================
