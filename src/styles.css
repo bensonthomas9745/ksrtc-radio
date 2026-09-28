@@ -1246,7 +1246,8 @@ button { color:inherit; cursor:pointer; }
 }
 
 .chat-messages-container {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
@@ -1880,6 +1881,8 @@ button { color:inherit; cursor:pointer; }
 
 /* Apple-Style Reply Preview Bar */
 .chat-reply-bar {
+  position: relative;
+  z-index: 25;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1952,6 +1955,8 @@ button { color:inherit; cursor:pointer; }
 
 /* Apple-Style Chat Input Pill & Capsule matching Mockup */
 .chat-input-form {
+  position: relative;
+  z-index: 20;
   padding: 10px 14px max(12px, env(safe-area-inset-bottom));
   background: #11141a;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -2090,8 +2095,10 @@ button { color:inherit; cursor:pointer; }
    Apple-Style Shelf Drawers: Emoji Picker, GIF Search & Media Attachment
    ========================================================================== */
 .chat-shelf-drawer {
+  position: relative;
+  z-index: 30;
   background: #141720;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
   display: flex;
@@ -2100,9 +2107,10 @@ button { color:inherit; cursor:pointer; }
   max-height: 200px;
   overflow: hidden;
   box-sizing: border-box;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
 }
 .chat-shelf-drawer.chat-gif-drawer {
-  max-height: 315px;
+  max-height: 320px;
 }
 .chat-shelf-drawer[hidden] {
   display: none !important;
@@ -2455,15 +2463,18 @@ button { color:inherit; cursor:pointer; }
 
 /* --- Attachment Preview Bar --- */
 .chat-attachment-bar {
+  position: relative;
+  z-index: 28;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 7px 14px;
   background: rgba(20, 24, 32, 0.98);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
   border-bottom: 0.5px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
   animation: shelf-slide-in .18s ease both;
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45);
 }
 .chat-attachment-bar[hidden] {
   display: none !important;
