@@ -1371,6 +1371,7 @@ const chatGifCloseBtn = $('chat-gif-close-btn');
 const chatGifSearchInput = $('chat-gif-search-input');
 const chatGifSearchClear = $('chat-gif-search-clear');
 const chatGifCatPills = $('chat-gif-cat-pills');
+const chatGifCountBadge = $('chat-gif-count-badge');
 const chatGifGrid = $('chat-gif-grid');
 const chatAttachmentBar = $('chat-attachment-bar');
 const chatAttachmentThumb = $('chat-attachment-thumb');
@@ -2711,37 +2712,107 @@ if (chatImgBtn && chatFileInput) {
 }
 
 // ==========================================================================
-// Curated Passenger GIF Library & Search
+// Curated Passenger GIF Library & Search (80+ Outside Sourced Media Assets)
 // ==========================================================================
 const PASSENGER_GIFS = [
-  // Aanavandi & Bus
-  { id: 'g1', cat: 'bus', title: 'Aanavandi Highway Ride', url: 'https://i.giphy.com/3o7TKSjRrfIPjeiVyM.gif' },
-  { id: 'g2', cat: 'bus', title: 'Window Seat Journey', url: 'https://i.giphy.com/l0MYt5jPR6QX5pnqM.gif' },
-  { id: 'g3', cat: 'bus', title: 'Bus Fast Cruise', url: 'https://i.giphy.com/3o7TKTDnUxE0g2fSE8.gif' },
-  { id: 'g4', cat: 'bus', title: 'Kerala Road Trip', url: 'https://i.giphy.com/26ufdipQqU2lhNA4g.gif' },
-  // Malayalam & Cinema
-  { id: 'g5', cat: 'malayalam', title: 'Salim Kumar Smile', url: 'https://i.giphy.com/111ebonMs90YLu.gif' },
-  { id: 'g6', cat: 'malayalam', title: 'Mohanlal Swag', url: 'https://i.giphy.com/5GoVLqeAOo6PK.gif' },
-  { id: 'g7', cat: 'malayalam', title: 'Epic Laugh', url: 'https://i.giphy.com/26xBwdWn7L3Pq5Xy0.gif' },
-  { id: 'g8', cat: 'malayalam', title: 'Standing Ovation', url: 'https://i.giphy.com/artj92V8o75VPL7AeQ.gif' },
-  // Music & Dance
-  { id: 'g9', cat: 'music', title: 'Vibing With Headphones', url: 'https://i.giphy.com/blSTtZehjAZ8I.gif' },
-  { id: 'g10', cat: 'music', title: 'Happy Dance', url: 'https://i.giphy.com/l3vRlT2k2L35Cbo52.gif' },
-  { id: 'g11', cat: 'music', title: 'Acoustic Guitar Melody', url: 'https://i.giphy.com/3oEjI6SIIHBdRxXI40.gif' },
-  { id: 'g12', cat: 'music', title: 'Bus Passenger Groove', url: 'https://i.giphy.com/3ohzdIuqJoo8QdKlnW.gif' },
-  // Rain & Mazha
-  { id: 'g13', cat: 'rain', title: 'Window Rain Drops', url: 'https://i.giphy.com/t7Qb8655Z1V9K.gif' },
-  { id: 'g14', cat: 'rain', title: 'Cozy Rain & Coffee', url: 'https://i.giphy.com/Mgq79RwAgAZVu.gif' },
-  { id: 'g15', cat: 'rain', title: 'Monsoon Downpour', url: 'https://i.giphy.com/26BGD4XaoPO3zTz9K.gif' },
-  { id: 'g16', cat: 'rain', title: 'Thunder & Mist', url: 'https://i.giphy.com/dI3D3BWfDub0Q.gif' },
-  // Comedy & Laughs
-  { id: 'g17', cat: 'comedy', title: 'Rolling with Laughter', url: 'https://i.giphy.com/JIX9t2j0ZTN9S.gif' },
-  { id: 'g18', cat: 'comedy', title: 'Mind Blown Reaction', url: 'https://i.giphy.com/xT0xeJpnrWC4XWblEk.gif' },
-  // Love & Vibe
-  { id: 'g19', cat: 'love', title: 'Love & Hearts', url: 'https://i.giphy.com/26BRv0ThflsHCqDrG.gif' },
-  { id: 'g20', cat: 'love', title: 'Touching Song Melody', url: 'https://i.giphy.com/l2Sq5G3KGtxDJnZbG.gif' },
-  { id: 'g21', cat: 'love', title: 'Big Hugs', url: 'https://i.giphy.com/3o7abKhOpu0NwenH3O.gif' },
-  { id: 'g22', cat: 'love', title: 'Respect & Cheers', url: 'https://i.giphy.com/l0HlIDueXmcWNTPOg.gif' }
+  // 1. Aanavandi & Bus Travel
+  { id: 'g1', cat: 'bus', title: 'Aanavandi Highway Ride', url: 'https://i.giphy.com/3o7TKSjRrfIPjeiVyM.gif', tags: ['aanavandi', 'ksrtc', 'highway', 'speed', 'kerala bus', 'ride', 'travel'] },
+  { id: 'g2', cat: 'bus', title: 'Window Seat Journey', url: 'https://i.giphy.com/l0MYt5jPR6QX5pnqM.gif', tags: ['window seat', 'journey', 'view', 'travel', 'breeze', 'scenic'] },
+  { id: 'g3', cat: 'bus', title: 'Fast Highway Cruise', url: 'https://i.giphy.com/3o7TKTDnUxE0g2fSE8.gif', tags: ['bus', 'fast', 'express', 'overtake', 'cruise', 'super fast'] },
+  { id: 'g4', cat: 'bus', title: 'Kerala Road Trip', url: 'https://i.giphy.com/26ufdipQqU2lhNA4g.gif', tags: ['kerala', 'road trip', 'nature', 'travel', 'bus ride', 'greenery'] },
+  { id: 'g5', cat: 'bus', title: 'Night Highway Express', url: 'https://i.giphy.com/l2Je2M4Nfrit0LWBG.gif', tags: ['night ride', 'highway', 'minnal', 'express', 'night bus', 'lights'] },
+  { id: 'g6', cat: 'bus', title: 'KSRTC Bus Turning', url: 'https://i.giphy.com/xT0xeuOyT4PqToYnnG.gif', tags: ['turning', 'drift', 'corner', 'ksrtc', 'driver', 'curve'] },
+  { id: 'g7', cat: 'bus', title: 'Mountain Ghat Road', url: 'https://i.giphy.com/3o7aD2d7hy9ktXNDP2.gif', tags: ['churam', 'wayanad', 'ghat road', 'hills', 'mountain', 'hairpin'] },
+  { id: 'g8', cat: 'bus', title: 'Bus Driver Driving', url: 'https://i.giphy.com/3o7btUg31RUpBK1nSU.gif', tags: ['driver', 'steering', 'aanavandi driver', 'pilot', 'gear', 'road'] },
+  { id: 'g9', cat: 'bus', title: 'Sunset Bus Window', url: 'https://i.giphy.com/xT9IgzoKnwFNmISR8I.gif', tags: ['sunset', 'window', 'evening', 'golden hour', 'peace', 'vibes'] },
+  { id: 'g10', cat: 'bus', title: 'Traffic Green Light Go', url: 'https://i.giphy.com/l0HlHJG5LC7b85e5q.gif', tags: ['green light', 'signal', 'go', 'depart', 'departure', 'start'] },
+  { id: 'g11', cat: 'bus', title: 'Morning Fog Ride', url: 'https://i.giphy.com/3o6Zt9y2JCuc4U5pn2.gif', tags: ['fog', 'munnar', 'mist', 'morning', 'cold', 'aesthetic'] },
+  { id: 'g12', cat: 'bus', title: 'Bus High Speed', url: 'https://i.giphy.com/3o6ZtpvPW63dzMr8E8.gif', tags: ['speed', 'rush', 'turbo', 'super fast', 'racing'] },
+  { id: 'g13', cat: 'bus', title: 'Breeze at Window', url: 'https://i.giphy.com/xT9IgLrmwmg6qN57Ow.gif', tags: ['breeze', 'wind', 'cool', 'hair fly', 'window'] },
+  { id: 'g14', cat: 'bus', title: 'Conductor Whistle & Bell', url: 'https://i.giphy.com/3o7TKTnJomJ8v0901e.gif', tags: ['conductor', 'ticket', 'bell', 'whistle', 'double bell', 'ksrtc'] },
+
+  // 2. Malayalam Cinema & Stars
+  { id: 'g15', cat: 'malayalam', title: 'Salim Kumar Smile', url: 'https://i.giphy.com/111ebonMs90YLu.gif', tags: ['salim kumar', 'smile', 'comedy', 'malayalam', 'manassinakkare', 'cinema'] },
+  { id: 'g16', cat: 'malayalam', title: 'Mohanlal Mass Entry', url: 'https://i.giphy.com/5GoVLqeAOo6PK.gif', tags: ['mohanlal', 'lalettan', 'mass', 'entry', 'cinema', 'narasimham'] },
+  { id: 'g17', cat: 'malayalam', title: 'Lalettan Moustache Swag', url: 'https://i.giphy.com/l0HlNqQ1G3f43pL44.gif', tags: ['mohanlal', 'moustache', 'meesha', 'swag', 'aaraam thampuran', 'style'] },
+  { id: 'g18', cat: 'malayalam', title: 'Mohanlal Classic Dance', url: 'https://i.giphy.com/3o6ozrA56w9028q0qY.gif', tags: ['mohanlal', 'lalettan', 'dance', 'cinema', 'step', 'vintage'] },
+  { id: 'g19', cat: 'malayalam', title: 'Mammootty Slow Motion Walk', url: 'https://i.giphy.com/26xBwdWn7L3Pq5Xy0.gif', tags: ['mammootty', 'mammukka', 'mass', 'slow motion', 'big b', 'swag'] },
+  { id: 'g20', cat: 'malayalam', title: 'Standing Ovation Claps', url: 'https://i.giphy.com/artj92V8o75VPL7AeQ.gif', tags: ['ovation', 'claps', 'applaud', 'cinema', 'theatre', 'mass'] },
+  { id: 'g21', cat: 'malayalam', title: 'Jagathy Sreekumar Express', url: 'https://i.giphy.com/3o7TKpGmo3nF124i8U.gif', tags: ['jagathy', 'sreekumar', 'kilukkam', 'yodha', 'expression', 'legend'] },
+  { id: 'g22', cat: 'malayalam', title: 'Innocent Iconic Laugh', url: 'https://i.giphy.com/3o85xwxrU57V0ak3qw.gif', tags: ['innocent', 'laugh', 'ramji rao', 'godfather', 'comedy', 'malayalam'] },
+  { id: 'g23', cat: 'malayalam', title: 'Mukesh Classic Reaction', url: 'https://i.giphy.com/l0HlvtIP327qkns52.gif', tags: ['mukesh', 'in harihar nagar', 'dialogue', 'classic', 'malayalam'] },
+  { id: 'g24', cat: 'malayalam', title: 'Suraj Venjaramoodu Shook', url: 'https://i.giphy.com/3o7qDSOvew1UGUUcxq.gif', tags: ['suraj', 'venjaramoodu', 'dashamoolam damu', 'shook', 'comedy'] },
+  { id: 'g25', cat: 'malayalam', title: 'Harisree Ashokan Ramanan', url: 'https://i.giphy.com/3o7btPCcdNniyf0ArS.gif', tags: ['harisree ashokan', 'ramanan', 'punjabi house', 'mudiyan', 'comedy'] },
+  { id: 'g26', cat: 'malayalam', title: 'Sreenivasan Deep Thinking', url: 'https://i.giphy.com/l1J9EdzfOSgfyueLm.gif', tags: ['sreenivasan', 'sandesham', 'thinking', 'philosophy', 'intellectual'] },
+  { id: 'g27', cat: 'malayalam', title: 'Nedumudi Venu Rhythm', url: 'https://i.giphy.com/l0MYC0LajBaPoEADu.gif', tags: ['nedumudi venu', 'chithram', 'bharatham', 'nostalgia', 'music'] },
+  { id: 'g28', cat: 'malayalam', title: 'Prem Nazir Everlasting Style', url: 'https://i.giphy.com/3o7TKDkDb2ap85Px2U.gif', tags: ['prem nazir', 'vintage', 'classic cinema', 'black and white', 'legend'] },
+
+  // 3. Comedy & Memes
+  { id: 'g29', cat: 'comedy', title: 'Rolling with Laughter', url: 'https://i.giphy.com/JIX9t2j0ZTN9S.gif', tags: ['laugh', 'lol', 'rofl', 'haha', 'funny', 'fun', 'joke'] },
+  { id: 'g30', cat: 'comedy', title: 'Mind Blown Reaction', url: 'https://i.giphy.com/xT0xeJpnrWC4XWblEk.gif', tags: ['mind blown', 'shock', 'wow', 'unbelievable', 'omg', 'insane'] },
+  { id: 'g31', cat: 'comedy', title: 'Enthado Paraye Salim Kumar', url: 'https://i.giphy.com/3oKIPbNb1vWd0DTq4o.gif', tags: ['salim kumar', 'enthado', 'paraye', 'meme', 'dialogue', 'cinema'] },
+  { id: 'g32', cat: 'comedy', title: 'Epic Facepalm', url: 'https://i.giphy.com/26n6WywqIAI8Iz5U4.gif', tags: ['facepalm', 'oh god', 'ayyo', 'disaster', 'mistake', 'oops'] },
+  { id: 'g33', cat: 'comedy', title: 'Tears of Laughter', url: 'https://i.giphy.com/3o7TKRBB3E7OI1MWo0.gif', tags: ['tears', 'crying laughter', 'dead laughing', 'haha', 'hysterical'] },
+  { id: 'g34', cat: 'comedy', title: 'Jagathy Shocked Eyes', url: 'https://i.giphy.com/3oEjHAUOqg3xSbhmhy.gif', tags: ['shocked', 'eyes wide', 'scared', 'gasp', 'surprise'] },
+  { id: 'g35', cat: 'comedy', title: 'Confused Passenger', url: 'https://i.giphy.com/l3q2K5jinAlChoCLS.gif', tags: ['confused', 'what', 'where', 'maths meme', 'question'] },
+  { id: 'g36', cat: 'comedy', title: 'Sarcastic Clapping', url: 'https://i.giphy.com/xT5LMB2EgxnRA6RECA.gif', tags: ['sarcastic', 'applause', 'clapping', 'slow clap', 'irony'] },
+  { id: 'g37', cat: 'comedy', title: 'Running Away Fast', url: 'https://i.giphy.com/l0MYGbN069Vj51sGI.gif', tags: ['run', 'escape', 'odiko', 'fast run', 'flee'] },
+  { id: 'g38', cat: 'comedy', title: 'Sneaky Giggle', url: 'https://i.giphy.com/3oEjI1erPMTMBFm8Du.gif', tags: ['sneaky', 'giggle', 'smirk', 'secret laugh', 'evil laugh'] },
+  { id: 'g39', cat: 'comedy', title: 'What Just Happened', url: 'https://i.giphy.com/l0HlBO7e9E8b54n3G.gif', tags: ['what', 'confused', 'shook', 'puzzled', 'blank'] },
+
+  // 4. Music, Beats & Dance
+  { id: 'g40', cat: 'music', title: 'Vibing With Headphones', url: 'https://i.giphy.com/blSTtZehjAZ8I.gif', tags: ['headphones', 'vibe', 'listening', 'song', 'chill', 'music'] },
+  { id: 'g41', cat: 'music', title: 'Happy Dance Moves', url: 'https://i.giphy.com/l3vRlT2k2L35Cbo52.gif', tags: ['happy dance', 'party', 'groove', 'celebration', 'dancing'] },
+  { id: 'g42', cat: 'music', title: 'Acoustic Guitar Melody', url: 'https://i.giphy.com/3oEjI6SIIHBdRxXI40.gif', tags: ['guitar', 'acoustic', 'melody', 'strings', 'song', 'acoustic session'] },
+  { id: 'g43', cat: 'music', title: 'Passenger Groove Beat', url: 'https://i.giphy.com/3ohzdIuqJoo8QdKlnW.gif', tags: ['groove', 'head bop', 'nodding', 'rhythm', 'beat'] },
+  { id: 'g44', cat: 'music', title: 'DJ Remix Beats', url: 'https://i.giphy.com/3o6ZtaO9BZHcOjmErm.gif', tags: ['dj', 'remix', 'mixer', 'club', 'bass', 'party'] },
+  { id: 'g45', cat: 'music', title: 'Chenda Melam Rhythm', url: 'https://i.giphy.com/l2Jhtx88q61w5L5sI.gif', tags: ['chenda', 'melam', 'thrissur pooram', 'kerala drum', 'traditional', 'percussion'] },
+  { id: 'g46', cat: 'music', title: 'Breakdance Step', url: 'https://i.giphy.com/3o7aDfeNtr76v007iU.gif', tags: ['breakdance', 'spin', 'hip hop', 'dance step', 'energy'] },
+  { id: 'g47', cat: 'music', title: 'Turn Up Radio Volume', url: 'https://i.giphy.com/3o7TKU8Vy924CwgUwg.gif', tags: ['radio', 'volume', 'loud', 'stereo', 'knob', 'boost'] },
+  { id: 'g48', cat: 'music', title: 'Vintage Cassette Tape', url: 'https://i.giphy.com/26uf2JHNV0Tq3N88o.gif', tags: ['cassette', 'tape', 'rewind', 'walkman', 'nostalgia', '90s'] },
+  { id: 'g49', cat: 'music', title: 'Melody Singer Mic', url: 'https://i.giphy.com/3o7TKBb69tI2P509i0.gif', tags: ['singer', 'mic', 'singing', 'vocalist', 'kj yesudas', 'melody'] },
+  { id: 'g50', cat: 'music', title: 'Vallamkali Boat Rhythm', url: 'https://i.giphy.com/3o7TKM6y9QvO10901e.gif', tags: ['vallamkali', 'boat race', 'vanchipattu', 'kerala rhythm', 'cheer'] },
+  { id: 'g51', cat: 'music', title: 'Piano Harmony', url: 'https://i.giphy.com/3o6Zt799G8Mh2l0Q1O.gif', tags: ['piano', 'keys', 'harmony', 'classical', 'notes'] },
+  { id: 'g52', cat: 'music', title: 'Heavy Bass Drop', url: 'https://i.giphy.com/3oEjI6hkw6Ggm4L4pq.gif', tags: ['bass drop', 'subwoofer', 'vibrate', 'shake', 'loud sound'] },
+
+  // 5. Mazha & Monsoon Vibes
+  { id: 'g53', cat: 'rain', title: 'Monsoon Window Drops', url: 'https://i.giphy.com/t7Qb8655Z1V9K.gif', tags: ['mazha', 'rain', 'window seat', 'drops', 'glass', 'monsoon'] },
+  { id: 'g54', cat: 'rain', title: 'Cozy Rain & Hot Chai', url: 'https://i.giphy.com/Mgq79RwAgAZVu.gif', tags: ['chai', 'tea', 'rain', 'cozy', 'sulaimani', 'kerala rain'] },
+  { id: 'g55', cat: 'rain', title: 'Heavy Kerala Downpour', url: 'https://i.giphy.com/26BGD4XaoPO3zTz9K.gif', tags: ['downpour', 'heavy rain', 'storm', 'flooding', 'thunderstorm'] },
+  { id: 'g56', cat: 'rain', title: 'Misty Thunder Clouds', url: 'https://i.giphy.com/dI3D3BWfDub0Q.gif', tags: ['thunder', 'lightning', 'clouds', 'mist', 'dark sky'] },
+  { id: 'g57', cat: 'rain', title: 'Bus Wiper in Rain', url: 'https://i.giphy.com/l0HlTy9x8FxXOQCpq.gif', tags: ['wiper', 'windshield', 'bus', 'rain driving', 'swish'] },
+  { id: 'g58', cat: 'rain', title: 'Rain Puddle Splashes', url: 'https://i.giphy.com/xT0xezQgu5xCDJuCP6.gif', tags: ['puddle', 'splash', 'boots', 'water', 'umbrella'] },
+  { id: 'g59', cat: 'rain', title: 'Green Palm Leaves in Rain', url: 'https://i.giphy.com/26AHG5KGFxSkK2Gqc.gif', tags: ['leaves', 'coconut tree', 'village rain', 'nature', 'kerala'] },
+
+  // 6. Love & Vibes
+  { id: 'g60', cat: 'love', title: 'Hearts Floating', url: 'https://i.giphy.com/26BRv0ThflsHCqDrG.gif', tags: ['hearts', 'love', 'sweet', 'romance', 'affection', 'care'] },
+  { id: 'g61', cat: 'love', title: 'Touching Song Melody', url: 'https://i.giphy.com/l2Sq5G3KGtxDJnZbG.gif', tags: ['romantic song', 'slow song', 'melody', 'feeling', 'touching'] },
+  { id: 'g62', cat: 'love', title: 'Warm Hug Embrace', url: 'https://i.giphy.com/3o7abKhOpu0NwenH3O.gif', tags: ['hug', 'cuddle', 'warm', 'friendship', 'bestie'] },
+  { id: 'g63', cat: 'love', title: 'Cheers & Brotherhood', url: 'https://i.giphy.com/l0HlIDueXmcWNTPOg.gif', tags: ['cheers', 'bro', 'respect', 'toasts', 'brotherhood', 'machan'] },
+  { id: 'g64', cat: 'love', title: 'Cute Shy Blush', url: 'https://i.giphy.com/3oEjI4sFl3stMN5BEs.gif', tags: ['blush', 'shy', 'cute', 'smile', 'flirt'] },
+  { id: 'g65', cat: 'love', title: 'Romantic Eye Wink', url: 'https://i.giphy.com/3o7TKoWXm3okO1kgHC.gif', tags: ['wink', 'flirt', 'charm', 'stylish', 'look'] },
+  { id: 'g66', cat: 'love', title: 'Cup of Tea With Love', url: 'https://i.giphy.com/3o6Mb43TveMB42UTHy.gif', tags: ['tea', 'coffee', 'steaming', 'heart', 'morning vibe'] },
+  { id: 'g67', cat: 'love', title: 'Golden Sunset Horizon', url: 'https://i.giphy.com/xT9IgsAZRBA27udVm8.gif', tags: ['sunset', 'golden', 'horizon', 'serene', 'peaceful'] },
+  { id: 'g68', cat: 'love', title: 'Miss You Thoughts', url: 'https://i.giphy.com/3o7TKRbM7v5F5605wY.gif', tags: ['miss you', 'nostalgia', 'remember', 'lonely', 'sweet'] },
+
+  // 7. Mass & Swag
+  { id: 'g69', cat: 'swag', title: 'Sunglasses Swag On', url: 'https://i.giphy.com/l0MYEqEzwMWFCg8rm.gif', tags: ['sunglasses', 'swag', 'shades', 'cool', 'attitude', 'mass'] },
+  { id: 'g70', cat: 'swag', title: 'Slow Motion Hero Walk', url: 'https://i.giphy.com/xT9IgG50Fb7Mi0prBC.gif', tags: ['slow motion', 'walk', 'hero', 'entry', 'mass entry', 'cinema'] },
+  { id: 'g71', cat: 'swag', title: 'Thug Life Grin', url: 'https://i.giphy.com/3o7abWBzKeaRksBQ7E.gif', tags: ['thug life', 'grin', 'attitude', 'boss', 'bada$$'] },
+  { id: 'g72', cat: 'swag', title: 'Smoke Cigar Mass Entry', url: 'https://i.giphy.com/3o7TKMGpx4L82bFzGg.gif', tags: ['mass entry', 'cigar', 'smoke', 'rajini style', 'fire'] },
+  { id: 'g73', cat: 'swag', title: 'Heavy Punch Power', url: 'https://i.giphy.com/l3q2XhfQ8oC9IKHZe.gif', tags: ['punch', 'fight', 'action', 'energy', 'power', 'action hero'] },
+  { id: 'g74', cat: 'swag', title: 'Fire Blast Explosion', url: 'https://i.giphy.com/26tOZqub2WjLrU8gg.gif', tags: ['fire', 'flames', 'explosion', 'lit', 'thee', 'blaze'] },
+  { id: 'g75', cat: 'swag', title: 'Golden Trophy Winner', url: 'https://i.giphy.com/3o7TKVfu4rwysCasla.gif', tags: ['trophy', 'winner', 'champion', 'gold', 'victory', 'first'] },
+  { id: 'g76', cat: 'swag', title: 'Boss Slowmo Stride', url: 'https://i.giphy.com/l0MYRzcWP7cMmAMSY.gif', tags: ['boss', 'stride', 'don', 'swag', 'leader', 'king'] },
+
+  // 8. Reactions & Welcomes
+  { id: 'g77', cat: 'reactions', title: 'Super Thumbs Up', url: 'https://i.giphy.com/3o7TKxG9BsmhB7u7Ju.gif', tags: ['thumbs up', 'super', 'adipoli', 'great', 'approved', 'like'] },
+  { id: 'g78', cat: 'reactions', title: 'Namaste Kerala Welcome', url: 'https://i.giphy.com/26AHpYjBPM520LPWw.gif', tags: ['namaste', 'vanakkam', 'welcome', 'respect', 'swagatham'] },
+  { id: 'g79', cat: 'reactions', title: 'High Five Bro', url: 'https://i.giphy.com/3oEjI5u845EYTOUTn2.gif', tags: ['high five', 'team', 'bro', 'partnership', 'cheers'] },
+  { id: 'g80', cat: 'reactions', title: 'Wave Goodbye Hand', url: 'https://i.giphy.com/l0MYxV67vKe0UI0VO.gif', tags: ['wave', 'bye', 'tata', 'goodbye', 'see you'] },
+  { id: 'g81', cat: 'reactions', title: 'Mind Blown Explosion', url: 'https://i.giphy.com/3o6Zt90UgeG7201Wec.gif', tags: ['mind blown', 'boom', 'head explosion', 'shocked'] },
+  { id: 'g82', cat: 'reactions', title: '100% Agree Yes', url: 'https://i.giphy.com/3o85xGocUH8RY0Wo48.gif', tags: ['100 percent', 'agree', 'nodding', 'yes', 'absolutely', 'facts'] },
+  { id: 'g83', cat: 'reactions', title: 'Saluting Conductor', url: 'https://i.giphy.com/3o7TKs35s2D0H5rF5m.gif', tags: ['salute', 'respect', 'officer', 'captain', 'conductor'] }
 ];
 
 let activeGifCategory = 'all';
@@ -2753,8 +2824,13 @@ function renderGifGrid(filterText = '') {
     const matchesCat = activeGifCategory === 'all' || g.cat === activeGifCategory;
     if (!matchesCat) return false;
     if (!clean) return true;
-    return g.title.toLowerCase().includes(clean) || g.cat.toLowerCase().includes(clean);
+    const tagMatch = Array.isArray(g.tags) && g.tags.some(t => t.toLowerCase().includes(clean));
+    return g.title.toLowerCase().includes(clean) || g.cat.toLowerCase().includes(clean) || tagMatch;
   });
+
+  if (chatGifCountBadge) {
+    chatGifCountBadge.textContent = `${filtered.length} GIFs`;
+  }
 
   if (filtered.length === 0) {
     chatGifGrid.innerHTML = `
