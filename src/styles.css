@@ -936,13 +936,21 @@ button { color:inherit; cursor:pointer; }
     max-height: 95px !important;
   }
   .chat-shelf-drawer {
-    max-height: 180px !important;
+    max-height: 185px !important;
+  }
+  .chat-shelf-drawer.chat-gif-drawer {
+    max-height: 295px !important;
   }
   .chat-emoji-grid {
-    max-height: 125px !important;
+    max-height: 130px !important;
   }
   .chat-gif-grid {
-    max-height: 120px !important;
+    height: 186px !important;
+    max-height: 186px !important;
+    gap: 7px !important;
+  }
+  .chat-gif-item {
+    height: 82px !important;
   }
   .chat-message-input,
   .chat-gif-search-input,
@@ -2093,6 +2101,9 @@ button { color:inherit; cursor:pointer; }
   overflow: hidden;
   box-sizing: border-box;
 }
+.chat-shelf-drawer.chat-gif-drawer {
+  max-height: 315px;
+}
 .chat-shelf-drawer[hidden] {
   display: none !important;
 }
@@ -2326,10 +2337,11 @@ button { color:inherit; cursor:pointer; }
 .chat-gif-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-  padding: 4px 12px 8px;
+  gap: 8px;
+  padding: 6px 12px 10px;
   overflow-y: auto;
-  max-height: 135px;
+  height: 196px;
+  max-height: 196px;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
@@ -2342,9 +2354,9 @@ button { color:inherit; cursor:pointer; }
 }
 .chat-gif-item {
   position: relative;
-  height: 75px;
+  height: 86px;
   aspect-ratio: 16 / 9;
-  border-radius: 8px;
+  border-radius: 9px;
   overflow: hidden;
   background: #1e222b;
   border: 1px solid rgba(255, 255, 255, 0.08);

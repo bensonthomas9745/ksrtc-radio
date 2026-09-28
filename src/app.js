@@ -2787,6 +2787,9 @@ if (chatGifBtn && chatGifDrawer) {
           chatGifSearchInput.focus();
         }
       }, 100);
+      if (chatMessagesContainer) {
+        chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+      }
     }
   });
 }
