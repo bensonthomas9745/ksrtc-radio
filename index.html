@@ -375,26 +375,46 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <div class="playlist-drag-handle" aria-hidden="true"></div>
 
           <header class="playlist-header chat-header">
-            <div class="playlist-header-left">
-              <h2 class="playlist-title">Passenger Chat</h2>
-              <span class="playlist-subtitle" id="chat-subtitle">Live on KSRTC Radio</span>
+            <div class="chat-header-bg-art" aria-hidden="true"></div>
+            <div class="chat-header-left">
+              <div class="chat-header-bus-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="#f5c871">
+                  <path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm-9.5-6V6h14v5H7z"/>
+                </svg>
+              </div>
+              <div class="chat-header-titles">
+                <h2 class="chat-title">Passenger <span class="chat-title-highlight">Chat</span></h2>
+                <span class="chat-subtitle" id="chat-subtitle">
+                  <span class="chat-live-pulse-dot" aria-hidden="true"></span>
+                  Live on KSRTC Radio
+                </span>
+              </div>
             </div>
-            <button type="button" class="playlist-close-btn" id="chat-close-btn" aria-label="Close chat">✕</button>
+            <div class="chat-header-right-actions">
+              <button type="button" class="chat-header-circle-btn chat-options-btn" id="chat-options-btn" aria-label="Chat options" title="Chat options">•••</button>
+              <button type="button" class="chat-header-circle-btn playlist-close-btn" id="chat-close-btn" aria-label="Close chat" title="Close chat">✕</button>
+            </div>
           </header>
 
           <div class="chat-user-bar">
-            <label for="chat-username-input" class="chat-user-label">Name:</label>
-            <div class="chat-username-field-wrap">
-              <input type="text" id="chat-username-input" class="chat-username-input" placeholder="e.g. Passenger #24" maxlength="24" autocomplete="off" />
-              <span class="chat-verified-badge" id="chat-verified-badge" title="Verified Station Admin" hidden aria-label="Verified Station Admin">
-                <svg class="verified-tick-icon" viewBox="0 0 24 24" width="14" height="14" fill="#38bdf8">
-                  <path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/>
+            <div class="chat-user-capsule">
+              <div class="chat-user-icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                 </svg>
-              </span>
-            </div>
-            <div class="chat-gender-selector" id="chat-gender-selector" role="radiogroup" aria-label="Gender selection">
-              <button type="button" class="chat-gender-pill is-active" id="chat-gender-m" data-gender="M" aria-label="Male" title="Male (M)">M</button>
-              <button type="button" class="chat-gender-pill" id="chat-gender-f" data-gender="F" aria-label="Female" title="Female (F)">F</button>
+              </div>
+              <div class="chat-username-field-wrap">
+                <input type="text" id="chat-username-input" class="chat-username-input" placeholder="e.g. Passenger #384" maxlength="24" autocomplete="off" />
+                <span class="chat-verified-badge" id="chat-verified-badge" title="Verified Station Admin" hidden aria-label="Verified Station Admin">
+                  <svg class="verified-tick-icon" viewBox="0 0 24 24" width="14" height="14" fill="#38bdf8">
+                    <path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/>
+                  </svg>
+                </span>
+              </div>
+              <div class="chat-gender-selector" id="chat-gender-selector" role="radiogroup" aria-label="Gender selection">
+                <button type="button" class="chat-gender-pill is-active" id="chat-gender-m" data-gender="M" aria-label="Male" title="Male (M)">M</button>
+                <button type="button" class="chat-gender-pill" id="chat-gender-f" data-gender="F" aria-label="Female" title="Female (F)">F</button>
+              </div>
             </div>
           </div>
 
@@ -451,19 +471,46 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
           <form class="chat-input-form" id="chat-form" autocomplete="off">
             <div class="chat-input-pill">
-              <input type="text" id="chat-message-input" class="chat-message-input" placeholder="Say something aboard KSRTC…" maxlength="140" autocomplete="off" required />
-              <button type="submit" class="chat-send-btn" id="chat-send-btn" aria-label="Send message" disabled>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <line x1="12" y1="19" x2="12" y2="5"></line>
-                  <polyline points="5 12 12 5 19 12"></polyline>
+              <button type="button" class="chat-input-icon-btn chat-emoji-btn" id="chat-emoji-btn" aria-label="Add emoji" title="Add emoji">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                  <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                  <line x1="15" y1="9" x2="15.01" y2="9"></line>
                 </svg>
               </button>
+              <input type="text" id="chat-message-input" class="chat-message-input" placeholder="Say something aboard KSRTC…" maxlength="140" autocomplete="off" required />
+              <button type="button" class="chat-input-icon-btn chat-img-btn" id="chat-img-btn" aria-label="Photos" title="Photos">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+              </button>
+              <button type="button" class="chat-input-icon-btn chat-gif-badge" id="chat-gif-btn" aria-label="GIF" title="GIF">
+                GIF
+              </button>
+              <button type="submit" class="chat-send-btn" id="chat-send-btn" aria-label="Send message">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Apple-Style Quick Reaction Chips -->
+            <div class="chat-quick-chips" id="chat-quick-chips" role="toolbar" aria-label="Quick passenger messages">
+              <button type="button" class="chat-chip" data-text="👋 Hello!">👋 Hello!</button>
+              <button type="button" class="chat-chip" data-text="🎵 Great song!">🎵 Great song!</button>
+              <button type="button" class="chat-chip" data-text="🚌 On my way!">🚌 On my way!</button>
+              <button type="button" class="chat-chip" data-text="😍 Love this!">😍 Love this!</button>
+              <button type="button" class="chat-chip" data-text="🌧️ Mazha vibes">🌧️ Mazha vibes</button>
+              <button type="button" class="chat-chip" data-text="📻 Aanavandi">📻 Aanavandi</button>
             </div>
           </form>
         </aside>
       </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=40"></script>
+    <script type="module" src="./src/app.js?v=41"></script>
   </body>
 </html>

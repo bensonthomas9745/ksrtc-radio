@@ -1566,8 +1566,9 @@ function openChatDrawer() {
   chatDrawerWrap.classList.add('is-open');
   if (chatToggle) chatToggle.setAttribute('aria-expanded', 'true');
 
+  // Keep glowing green dot visible full-time as requested
   if (chatUnreadDot) {
-    chatUnreadDot.hidden = true;
+    chatUnreadDot.hidden = false;
   }
 
   if (chatMessagesContainer) {
@@ -1999,20 +2000,19 @@ function initLiveSessionsAndChat() {
 
   function updateMessageLikeUI(msgId, count, hasLiked) {
     if (!chatMessagesContainer) return;
-    const msgEl = chatMessagesContainer.querySelector(`.chat-msg[data-id="${msgId}"]`);
+    const msgEl = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${msgId}"], .chat-msg[data-id="${msgId}"]`);
     if (!msgEl) return;
 
     const likeBtn = msgEl.querySelector('.chat-like-btn');
     if (likeBtn) {
       likeBtn.classList.toggle('has-liked', Boolean(hasLiked));
-      const countEl = likeBtn.querySelector('.chat-like-count');
+      const iconEl = likeBtn.querySelector('.chat-pill-icon');
+      if (iconEl) {
+        iconEl.textContent = hasLiked ? '❤️' : (count > 0 ? '❤️' : '🤍');
+      }
+      const countEl = likeBtn.querySelector('.chat-pill-count, .chat-like-count');
       if (countEl) {
         countEl.textContent = count > 0 ? String(count) : '';
-      }
-      const svg = likeBtn.querySelector('svg');
-      if (svg) {
-        svg.setAttribute('fill', hasLiked ? '#f43f5e' : 'none');
-        svg.setAttribute('stroke', hasLiked ? '#f43f5e' : 'currentColor');
       }
     }
 
@@ -2079,7 +2079,7 @@ function initLiveSessionsAndChat() {
     const text = (data.text || '').trim();
     if (!text) return;
 
-    const tagColor = isVerified ? '#38bdf8' : (isMe ? '#34d399' : getPassengerColor(senderName));
+    const tagColor = isVerified ? '#f5c871' : (isMe ? '#38bdf8' : getPassengerColor(senderName));
     const timeStr = formatChatTime(data.timestamp);
 
     const gender = (data.gender === 'M' || data.gender === 'F')
@@ -2105,56 +2105,63 @@ function initLiveSessionsAndChat() {
       `;
     }
 
+    // Determine the song thumbnail for avatar from the song playing in player
+    let thumbUrl = (data.trackThumb && typeof data.trackThumb === 'string' && data.trackThumb.startsWith('http'))
+      ? data.trackThumb
+      : null;
+    if (!thumbUrl && Array.isArray(playlist) && playlist.length > 0) {
+      let hash = 0;
+      const seed = (msgId || '') + (senderName || '');
+      for (let i = 0; i < seed.length; i++) hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      const idx = Math.abs(hash) % playlist.length;
+      thumbUrl = playlist[idx]?.albumArt || playlist[0]?.albumArt || '';
+    }
+    if (!thumbUrl) {
+      thumbUrl = 'assets/images/ksrtc-journey-fallback.png';
+    }
+    const trackTitle = data.trackTitle || 'Now Playing';
+
     const likesObj = (data.likes && typeof data.likes === 'object') ? data.likes : {};
     const likeCount = Object.keys(likesObj).length;
     const hasLiked = Boolean(likesObj[mySessionId]) || localLikedMsgIds.has(msgId);
 
-    let tapbackHtml = '';
-    if (likeCount > 0) {
-      tapbackHtml = `
-        <div class="chat-tapback-badge ${hasLiked ? 'is-liked' : ''}" data-id="${escapeHtml(msgId)}" title="${likeCount} Like${likeCount > 1 ? 's' : ''}">
-          <span class="tapback-emoji">❤️</span><span class="tapback-count">${likeCount}</span>
-        </div>
-      `;
-    }
-
     const msgEl = document.createElement('div');
-    msgEl.className = `chat-msg ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''}`;
+    msgEl.className = `chat-msg-row ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''} is-gender-${gender.toLowerCase()}`;
     msgEl.dataset.id = msgId;
 
     msgEl.innerHTML = `
-      <div class="chat-msg-bubble">
-        ${replyQuoteHtml}
+      <div class="chat-avatar-wrap" title="${escapeHtml(trackTitle)}">
+        <img class="chat-avatar-img" src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(trackTitle)}" loading="lazy" onerror="this.src='assets/images/ksrtc-journey-fallback.png'" />
+      </div>
+      <div class="chat-msg-col">
         <div class="chat-msg-header">
           <span class="chat-msg-sender" style="color: ${tagColor};">${senderHtml}</span>
-          <div class="chat-msg-header-right">
-            <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
-          </div>
+          <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
         </div>
-        <div class="chat-msg-text">${escapeHtml(text)}</div>
-        ${tapbackHtml}
-      </div>
-      <div class="chat-msg-actions">
-        <button type="button" class="chat-action-btn chat-like-btn ${hasLiked ? 'has-liked' : ''}" data-id="${escapeHtml(msgId)}" title="Like message" aria-label="Like message">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="${hasLiked ? '#f43f5e' : 'none'}" stroke="${hasLiked ? '#f43f5e' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-          </svg>
-          <span class="chat-like-count">${likeCount > 0 ? likeCount : ''}</span>
-        </button>
-        <button type="button" class="chat-action-btn chat-reply-btn" data-id="${escapeHtml(msgId)}" title="Reply to message" aria-label="Reply to message">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="9 17 4 12 9 7"></polyline>
-            <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
-          </svg>
-          Reply
-        </button>
-        <div class="chat-admin-actions">
-          <button type="button" class="chat-admin-action-btn chat-pin-btn" data-id="${escapeHtml(msgId)}" title="Pin message" aria-label="Pin message">
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/></svg>
+        <div class="chat-msg-bubble">
+          ${replyQuoteHtml}
+          <div class="chat-msg-text">${escapeHtml(text)}</div>
+        </div>
+        <div class="chat-msg-actions">
+          <button type="button" class="chat-pill-btn chat-like-btn ${hasLiked ? 'has-liked' : ''}" data-id="${escapeHtml(msgId)}" title="Like message" aria-label="Like message">
+            <span class="chat-pill-icon">${hasLiked ? '❤️' : (likeCount > 0 ? '❤️' : '🤍')}</span>
+            <span class="chat-pill-count">${likeCount > 0 ? likeCount : ''}</span>
           </button>
-          <button type="button" class="chat-admin-action-btn chat-delete-btn" data-id="${escapeHtml(msgId)}" title="Delete message" aria-label="Delete message">
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-6 5v6m4-6v6"/></svg>
+          <button type="button" class="chat-pill-btn chat-reply-btn" data-id="${escapeHtml(msgId)}" title="Reply to message" aria-label="Reply to message">
+            <span class="chat-pill-icon">↰</span>
+            <span>Reply</span>
           </button>
+          <button type="button" class="chat-pill-btn chat-more-btn" data-id="${escapeHtml(msgId)}" title="Options" aria-label="Options">
+            <span>•••</span>
+          </button>
+          <div class="chat-admin-actions">
+            <button type="button" class="chat-admin-action-btn chat-pin-btn" data-id="${escapeHtml(msgId)}" title="Pin message" aria-label="Pin message">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/></svg>
+            </button>
+            <button type="button" class="chat-admin-action-btn chat-delete-btn" data-id="${escapeHtml(msgId)}" title="Delete message" aria-label="Delete message">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-6 5v6m4-6v6"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -2166,7 +2173,7 @@ function initLiveSessionsAndChat() {
     chatMessagesContainer.appendChild(msgEl);
 
     // Enforce keeping only the last 10 messages in the chatbox
-    const allMsgs = chatMessagesContainer.querySelectorAll('.chat-msg');
+    const allMsgs = chatMessagesContainer.querySelectorAll('.chat-msg-row, .chat-msg');
     if (allMsgs.length > 10) {
       for (let i = 0; i < allMsgs.length - 10; i++) {
         const oldMsg = allMsgs[i];
@@ -2190,11 +2197,9 @@ function initLiveSessionsAndChat() {
       triggerSongPoppingMessage(senderName, text, tagColor, isVerified, gender, data.replyTo);
     }
 
-    // Trigger glowing green dot for unread messages if chat drawer is currently closed
-    if (isLive && !isChatOpen() && !isMe) {
-      if (chatUnreadDot) {
-        chatUnreadDot.hidden = false;
-      }
+    // Keep glowing green dot visible full-time as requested
+    if (chatUnreadDot) {
+      chatUnreadDot.hidden = false;
     }
   }
 
@@ -2218,7 +2223,7 @@ function initLiveSessionsAndChat() {
       const replyBtn = e.target.closest('.chat-reply-btn');
       if (replyBtn) {
         const msgId = replyBtn.getAttribute('data-id');
-        const msgEl = replyBtn.closest('.chat-msg');
+        const msgEl = replyBtn.closest('.chat-msg-row, .chat-msg');
         if (msgEl) {
           const senderName = msgEl.querySelector('.chat-sender-name')?.textContent || 'Passenger';
           const text = msgEl.querySelector('.chat-msg-text')?.textContent || '';
@@ -2228,12 +2233,29 @@ function initLiveSessionsAndChat() {
         return;
       }
 
-      // 3. Quoted reply click -> scroll to original message
+      // 3. More options (•••) button click
+      const moreBtn = e.target.closest('.chat-more-btn');
+      if (moreBtn) {
+        const msgId = moreBtn.getAttribute('data-id');
+        const msgEl = moreBtn.closest('.chat-msg-row, .chat-msg');
+        if (msgEl) {
+          const adminActions = msgEl.querySelector('.chat-admin-actions');
+          if (isAdminVerified && adminActions) {
+            adminActions.style.display = adminActions.style.display === 'inline-flex' ? 'none' : 'inline-flex';
+          } else {
+            // Friendly passenger tap
+            notify('Like or reply to connect with this passenger! 🚌💬');
+          }
+        }
+        return;
+      }
+
+      // 4. Quoted reply click -> scroll to original message
       const replyQuote = e.target.closest('.chat-reply-quote');
       if (replyQuote) {
         const targetId = replyQuote.getAttribute('data-target-id');
         if (targetId && chatMessagesContainer) {
-          const targetMsg = chatMessagesContainer.querySelector(`.chat-msg[data-id="${targetId}"]`);
+          const targetMsg = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${targetId}"], .chat-msg[data-id="${targetId}"]`);
           if (targetMsg) {
             targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
             targetMsg.classList.add('is-highlighted');
@@ -2245,7 +2267,7 @@ function initLiveSessionsAndChat() {
         return;
       }
 
-      // 4. Admin delete
+      // 5. Admin delete
       const deleteBtn = e.target.closest('.chat-delete-btn');
       if (deleteBtn) {
         const msgId = deleteBtn.getAttribute('data-id');
@@ -2499,12 +2521,20 @@ function initLiveSessionsAndChat() {
       };
 
       sendChatMessageFn = (name, text, isSenderAdmin = false, gender = 'M', replyTo = null) => {
+        const curTrack = (typeof playlist !== 'undefined' && Array.isArray(playlist) && playlist[state?.currentSongIndex])
+          ? playlist[state.currentSongIndex]
+          : (Array.isArray(playlist) ? playlist[0] : null);
+        const trackThumb = curTrack?.albumArt || '';
+        const trackTitle = curTrack?.title || '';
+
         const payload = {
           name,
           text,
           gender: gender || 'M',
           session: mySessionId,
-          timestamp: serverTimestamp()
+          timestamp: serverTimestamp(),
+          trackThumb: trackThumb,
+          trackTitle: trackTitle
         };
         if (replyTo && replyTo.name) {
           payload.replyTo = {
@@ -2532,6 +2562,63 @@ function initLiveSessionsAndChat() {
 }
 
 initLiveSessionsAndChat();
+
+// Apple-Style Quick Reaction Chips & Input Actions Wiring
+const quickChipsContainer = $('chat-quick-chips');
+if (quickChipsContainer) {
+  quickChipsContainer.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chat-chip');
+    if (!chip) return;
+    const chipText = chip.getAttribute('data-text') || chip.textContent.trim();
+    if (!chipText || !chatMessageInput) return;
+
+    chatMessageInput.value = chipText;
+    if (chatSendBtn) chatSendBtn.disabled = false;
+    if (chatForm) {
+      chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  });
+}
+
+const chatEmojiBtn = $('chat-emoji-btn');
+if (chatEmojiBtn && chatMessageInput) {
+  const passengerEmojis = ['🚌', '🎵', '🌧️', '😍', '❤️', '🚍', '✨', '👋'];
+  let emojiCycleIndex = 0;
+  chatEmojiBtn.addEventListener('click', () => {
+    const emoji = passengerEmojis[emojiCycleIndex % passengerEmojis.length];
+    emojiCycleIndex++;
+    chatMessageInput.value = chatMessageInput.value ? `${chatMessageInput.value} ${emoji}` : emoji;
+    chatMessageInput.focus();
+    if (chatSendBtn) chatSendBtn.disabled = false;
+  });
+}
+
+const chatImgBtn = $('chat-img-btn');
+if (chatImgBtn) {
+  chatImgBtn.addEventListener('click', () => {
+    notify('Photo sharing is coming soon aboard KSRTC Radio! 📷✨');
+  });
+}
+
+const chatGifBtn = $('chat-gif-btn');
+if (chatGifBtn) {
+  chatGifBtn.addEventListener('click', () => {
+    notify('GIF reactions coming in the next station stop! 🎞️🚍');
+  });
+}
+
+const chatOptionsBtn = $('chat-options-btn');
+if (chatOptionsBtn) {
+  chatOptionsBtn.addEventListener('click', () => {
+    if (chatSystemNote) {
+      chatSystemNote.hidden = false;
+      chatSystemNote.style.opacity = '1';
+      chatSystemNote.style.transform = 'none';
+      try { localStorage.removeItem(CHAT_NOTE_DISMISSED_KEY); } catch (e) {}
+      notify('KSRTC Radio guidelines opened.');
+    }
+  });
+}
 
 
 
