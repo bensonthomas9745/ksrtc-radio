@@ -1361,6 +1361,29 @@ const chatReplyBarTitle = $('chat-reply-bar-title');
 const chatReplyBarSnippet = $('chat-reply-bar-snippet');
 const chatReplyCancelBtn = $('chat-reply-cancel-btn');
 
+// Media & Drawer DOM Elements
+const chatEmojiDrawer = $('chat-emoji-drawer');
+const chatEmojiCloseBtn = $('chat-emoji-close-btn');
+const chatEmojiGrid = $('chat-emoji-grid');
+const chatEmojiCats = $('chat-emoji-cats');
+const chatGifDrawer = $('chat-gif-drawer');
+const chatGifCloseBtn = $('chat-gif-close-btn');
+const chatGifSearchInput = $('chat-gif-search-input');
+const chatGifSearchClear = $('chat-gif-search-clear');
+const chatGifCatPills = $('chat-gif-cat-pills');
+const chatGifGrid = $('chat-gif-grid');
+const chatAttachmentBar = $('chat-attachment-bar');
+const chatAttachmentThumb = $('chat-attachment-thumb');
+const chatAttachmentBadge = $('chat-attachment-badge');
+const chatAttachmentName = $('chat-attachment-name');
+const chatAttachmentRemoveBtn = $('chat-attachment-remove-btn');
+const chatFileInput = $('chat-file-input');
+const chatLightbox = $('chat-lightbox');
+const chatLightboxImg = $('chat-lightbox-img');
+const chatLightboxClose = $('chat-lightbox-close');
+const chatLightboxBackdrop = $('chat-lightbox-backdrop');
+
+let currentAttachment = null;
 let currentReplyTo = null;
 let toggleLikeChatMessageFn = null;
 const localLikedMsgIds = new Set();
@@ -1766,10 +1789,15 @@ if (chatReplyCancelBtn) {
   chatReplyCancelBtn.addEventListener('click', clearReplyingTo);
 }
 
-if (chatMessageInput && chatSendBtn) {
-  chatMessageInput.addEventListener('input', () => {
-    chatSendBtn.disabled = !chatMessageInput.value.trim();
-  });
+function updateChatSendButtonState() {
+  if (!chatSendBtn) return;
+  const hasText = Boolean(chatMessageInput && chatMessageInput.value.trim());
+  const hasMedia = Boolean(currentAttachment && currentAttachment.url);
+  chatSendBtn.disabled = !hasText && !hasMedia;
+}
+
+if (chatMessageInput) {
+  chatMessageInput.addEventListener('input', updateChatSendButtonState);
 }
 
 if (chatForm && chatMessageInput) {
@@ -1777,7 +1805,7 @@ if (chatForm && chatMessageInput) {
     e.preventDefault();
 
     const text = chatMessageInput.value.trim();
-    if (!text) return;
+    if (!text && !currentAttachment) return;
 
     if (text.length > 140) {
       notify('Message must be 140 characters or fewer.');
@@ -1812,16 +1840,23 @@ if (chatForm && chatMessageInput) {
       text: (currentReplyTo.text || '').slice(0, 80)
     } : null;
 
-    sendChatMessageFn(activeName.slice(0, 24), text, isAdminVerified, currentChatGender, replyPayload)
+    const mediaPayload = currentAttachment ? { ...currentAttachment } : null;
+
+    sendChatMessageFn(activeName.slice(0, 24), text, isAdminVerified, currentChatGender, replyPayload, mediaPayload)
       .then(() => {
         chatMessageInput.value = '';
-        if (chatSendBtn) chatSendBtn.disabled = true;
+        currentAttachment = null;
+        if (chatAttachmentBar) chatAttachmentBar.hidden = true;
+        if (chatFileInput) chatFileInput.value = '';
+        if (chatEmojiDrawer) chatEmojiDrawer.hidden = true;
+        if (chatGifDrawer) chatGifDrawer.hidden = true;
+        updateChatSendButtonState();
         clearReplyingTo();
         chatMessageInput.focus();
       })
       .catch((err) => {
         console.warn('Chat send error:', err);
-        if (chatSendBtn) chatSendBtn.disabled = !chatMessageInput.value.trim();
+        updateChatSendButtonState();
         notify('Unable to send message right now.');
       });
   });
@@ -2077,7 +2112,9 @@ function initLiveSessionsAndChat() {
     }
 
     const text = (data.text || '').trim();
-    if (!text) return;
+    const hasImage = Boolean(data.imageUrl);
+    const hasGif = Boolean(data.gifUrl);
+    if (!text && !hasImage && !hasGif) return;
 
     const tagColor = isVerified ? '#f5c871' : (isMe ? '#38bdf8' : getPassengerColor(senderName));
     const timeStr = formatChatTime(data.timestamp);
@@ -2125,6 +2162,22 @@ function initLiveSessionsAndChat() {
     const likeCount = Object.keys(likesObj).length;
     const hasLiked = Boolean(likesObj[mySessionId]) || localLikedMsgIds.has(msgId);
 
+    let mediaHtml = '';
+    if (data.imageUrl) {
+      mediaHtml += `
+        <div class="chat-msg-media-wrap" data-img-src="${escapeHtml(data.imageUrl)}" title="Tap to expand photo">
+          <img class="chat-msg-media-img" src="${escapeHtml(data.imageUrl)}" alt="Shared photo" loading="lazy" />
+        </div>
+      `;
+    }
+    if (data.gifUrl) {
+      mediaHtml += `
+        <div class="chat-msg-media-wrap chat-msg-gif-wrap" data-img-src="${escapeHtml(data.gifUrl)}" title="Tap to expand GIF">
+          <img class="chat-msg-media-img chat-msg-gif-img" src="${escapeHtml(data.gifUrl)}" alt="Shared GIF" loading="lazy" />
+        </div>
+      `;
+    }
+
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg-row ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''} is-gender-${gender.toLowerCase()}`;
     msgEl.dataset.id = msgId;
@@ -2140,7 +2193,8 @@ function initLiveSessionsAndChat() {
         </div>
         <div class="chat-msg-bubble">
           ${replyQuoteHtml}
-          <div class="chat-msg-text">${escapeHtml(text)}</div>
+          ${mediaHtml}
+          ${text ? `<div class="chat-msg-text">${escapeHtml(text)}</div>` : ''}
         </div>
         <div class="chat-msg-actions">
           <button type="button" class="chat-pill-btn chat-like-btn ${hasLiked ? 'has-liked' : ''}" data-id="${escapeHtml(msgId)}" title="Like message" aria-label="Like message">
@@ -2194,7 +2248,8 @@ function initLiveSessionsAndChat() {
 
     // Trigger 2-second popping message on top of the song slider for live messages!
     if (isLive) {
-      triggerSongPoppingMessage(senderName, text, tagColor, isVerified, gender, data.replyTo);
+      const popSnippet = text || (hasImage ? '📷 Shared a photo' : (hasGif ? '🎞️ Shared a GIF' : ''));
+      triggerSongPoppingMessage(senderName, popSnippet, tagColor, isVerified, gender, data.replyTo);
     }
 
     // Keep glowing green dot visible full-time as requested
@@ -2205,6 +2260,16 @@ function initLiveSessionsAndChat() {
 
   if (chatMessagesContainer) {
     chatMessagesContainer.addEventListener('click', (e) => {
+      // 0. Media click -> Open Lightbox
+      const mediaWrap = e.target.closest('.chat-msg-media-wrap');
+      if (mediaWrap) {
+        const src = mediaWrap.getAttribute('data-img-src');
+        if (src && typeof openChatLightbox === 'function') {
+          openChatLightbox(src);
+        }
+        return;
+      }
+
       // 1. Like button or Tapback badge click
       const likeTrigger = e.target.closest('.chat-like-btn, .chat-tapback-badge');
       if (likeTrigger) {
@@ -2520,7 +2585,7 @@ function initLiveSessionsAndChat() {
         return remove(ref(db, 'messages/_pinned'));
       };
 
-      sendChatMessageFn = (name, text, isSenderAdmin = false, gender = 'M', replyTo = null) => {
+      sendChatMessageFn = (name, text, isSenderAdmin = false, gender = 'M', replyTo = null, mediaAttachment = null) => {
         const curTrack = (typeof playlist !== 'undefined' && Array.isArray(playlist) && playlist[state?.currentSongIndex])
           ? playlist[state.currentSongIndex]
           : (Array.isArray(playlist) ? playlist[0] : null);
@@ -2529,13 +2594,20 @@ function initLiveSessionsAndChat() {
 
         const payload = {
           name,
-          text,
+          text: text || '',
           gender: gender || 'M',
           session: mySessionId,
           timestamp: serverTimestamp(),
           trackThumb: trackThumb,
           trackTitle: trackTitle
         };
+        if (mediaAttachment && mediaAttachment.url) {
+          if (mediaAttachment.type === 'image') {
+            payload.imageUrl = mediaAttachment.url;
+          } else if (mediaAttachment.type === 'gif') {
+            payload.gifUrl = mediaAttachment.url;
+          }
+        }
         if (replyTo && replyTo.name) {
           payload.replyTo = {
             id: replyTo.id || '',
@@ -2563,7 +2635,332 @@ function initLiveSessionsAndChat() {
 
 initLiveSessionsAndChat();
 
-// Apple-Style Quick Reaction Chips & Input Actions Wiring
+// ==========================================================================
+// Media Attachments & Compression Handling
+// ==========================================================================
+function compressImageFile(file, maxWidth = 720, maxHeight = 720, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth || h > maxHeight) {
+          if (w / h > maxWidth / maxHeight) {
+            h = Math.round((h * maxWidth) / w);
+            w = maxWidth;
+          } else {
+            w = Math.round((w * maxHeight) / h);
+            h = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('Failed to load image.'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function setMediaAttachment(type, url, name) {
+  currentAttachment = { type, url, name };
+  if (chatAttachmentBar && chatAttachmentThumb && chatAttachmentBadge && chatAttachmentName) {
+    chatAttachmentThumb.src = url;
+    chatAttachmentBadge.textContent = type === 'image' ? 'PHOTO' : 'GIF';
+    chatAttachmentName.textContent = name || (type === 'image' ? 'Photo Attached' : 'GIF Attached');
+    chatAttachmentBar.hidden = false;
+  }
+  if (chatEmojiDrawer) chatEmojiDrawer.hidden = true;
+  if (chatGifDrawer) chatGifDrawer.hidden = true;
+  updateChatSendButtonState();
+  if (chatMessageInput) chatMessageInput.focus();
+}
+
+function clearMediaAttachment() {
+  currentAttachment = null;
+  if (chatAttachmentBar) chatAttachmentBar.hidden = true;
+  if (chatFileInput) chatFileInput.value = '';
+  updateChatSendButtonState();
+}
+
+if (chatAttachmentRemoveBtn) {
+  chatAttachmentRemoveBtn.addEventListener('click', clearMediaAttachment);
+}
+
+// Photo Upload Button & File Input
+const chatImgBtn = $('chat-img-btn');
+if (chatImgBtn && chatFileInput) {
+  chatImgBtn.addEventListener('click', () => {
+    chatFileInput.click();
+  });
+
+  chatFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      notify('Please select a valid photo/image.');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      notify('Please select an image under 15MB.');
+      return;
+    }
+
+    try {
+      notify('Optimizing photo for KSRTC passengers… 📷');
+      const compressedUrl = await compressImageFile(file);
+      setMediaAttachment('image', compressedUrl, file.name || 'Passenger Photo');
+    } catch (err) {
+      console.warn('Image processing error:', err);
+      notify('Failed to process image.');
+    }
+  });
+}
+
+// ==========================================================================
+// Curated Passenger GIF Library & Search
+// ==========================================================================
+const PASSENGER_GIFS = [
+  // Aanavandi & Bus
+  { id: 'g1', cat: 'bus', title: 'Aanavandi Highway Ride', url: 'https://i.giphy.com/3o7TKSjRrfIPjeiVyM.gif' },
+  { id: 'g2', cat: 'bus', title: 'Window Seat Journey', url: 'https://i.giphy.com/l0MYt5jPR6QX5pnqM.gif' },
+  { id: 'g3', cat: 'bus', title: 'Bus Fast Cruise', url: 'https://i.giphy.com/3o7TKTDnUxE0g2fSE8.gif' },
+  { id: 'g4', cat: 'bus', title: 'Kerala Road Trip', url: 'https://i.giphy.com/26ufdipQqU2lhNA4g.gif' },
+  // Malayalam & Cinema
+  { id: 'g5', cat: 'malayalam', title: 'Salim Kumar Smile', url: 'https://i.giphy.com/111ebonMs90YLu.gif' },
+  { id: 'g6', cat: 'malayalam', title: 'Mohanlal Swag', url: 'https://i.giphy.com/5GoVLqeAOo6PK.gif' },
+  { id: 'g7', cat: 'malayalam', title: 'Epic Laugh', url: 'https://i.giphy.com/26xBwdWn7L3Pq5Xy0.gif' },
+  { id: 'g8', cat: 'malayalam', title: 'Standing Ovation', url: 'https://i.giphy.com/artj92V8o75VPL7AeQ.gif' },
+  // Music & Dance
+  { id: 'g9', cat: 'music', title: 'Vibing With Headphones', url: 'https://i.giphy.com/blSTtZehjAZ8I.gif' },
+  { id: 'g10', cat: 'music', title: 'Happy Dance', url: 'https://i.giphy.com/l3vRlT2k2L35Cbo52.gif' },
+  { id: 'g11', cat: 'music', title: 'Acoustic Guitar Melody', url: 'https://i.giphy.com/3oEjI6SIIHBdRxXI40.gif' },
+  { id: 'g12', cat: 'music', title: 'Bus Passenger Groove', url: 'https://i.giphy.com/3ohzdIuqJoo8QdKlnW.gif' },
+  // Rain & Mazha
+  { id: 'g13', cat: 'rain', title: 'Window Rain Drops', url: 'https://i.giphy.com/t7Qb8655Z1V9K.gif' },
+  { id: 'g14', cat: 'rain', title: 'Cozy Rain & Coffee', url: 'https://i.giphy.com/Mgq79RwAgAZVu.gif' },
+  { id: 'g15', cat: 'rain', title: 'Monsoon Downpour', url: 'https://i.giphy.com/26BGD4XaoPO3zTz9K.gif' },
+  { id: 'g16', cat: 'rain', title: 'Thunder & Mist', url: 'https://i.giphy.com/dI3D3BWfDub0Q.gif' },
+  // Comedy & Laughs
+  { id: 'g17', cat: 'comedy', title: 'Rolling with Laughter', url: 'https://i.giphy.com/JIX9t2j0ZTN9S.gif' },
+  { id: 'g18', cat: 'comedy', title: 'Mind Blown Reaction', url: 'https://i.giphy.com/xT0xeJpnrWC4XWblEk.gif' },
+  // Love & Vibe
+  { id: 'g19', cat: 'love', title: 'Love & Hearts', url: 'https://i.giphy.com/26BRv0ThflsHCqDrG.gif' },
+  { id: 'g20', cat: 'love', title: 'Touching Song Melody', url: 'https://i.giphy.com/l2Sq5G3KGtxDJnZbG.gif' },
+  { id: 'g21', cat: 'love', title: 'Big Hugs', url: 'https://i.giphy.com/3o7abKhOpu0NwenH3O.gif' },
+  { id: 'g22', cat: 'love', title: 'Respect & Cheers', url: 'https://i.giphy.com/l0HlIDueXmcWNTPOg.gif' }
+];
+
+let activeGifCategory = 'all';
+
+function renderGifGrid(filterText = '') {
+  if (!chatGifGrid) return;
+  const clean = filterText.trim().toLowerCase();
+  const filtered = PASSENGER_GIFS.filter((g) => {
+    const matchesCat = activeGifCategory === 'all' || g.cat === activeGifCategory;
+    if (!matchesCat) return false;
+    if (!clean) return true;
+    return g.title.toLowerCase().includes(clean) || g.cat.toLowerCase().includes(clean);
+  });
+
+  if (filtered.length === 0) {
+    chatGifGrid.innerHTML = `
+      <div style="grid-column: span 2; text-align: center; padding: 24px 10px; color: #64748b; font-size: 12px;">
+        No GIFs found for "${escapeHtml(clean)}". Try another search or category!
+      </div>
+    `;
+    return;
+  }
+
+  chatGifGrid.innerHTML = filtered.map((g) => `
+    <div class="chat-gif-item" data-gif-url="${escapeHtml(g.url)}" data-gif-title="${escapeHtml(g.title)}" title="${escapeHtml(g.title)}">
+      <img src="${escapeHtml(g.url)}" alt="${escapeHtml(g.title)}" loading="lazy" />
+      <span class="chat-gif-item-title">${escapeHtml(g.title)}</span>
+    </div>
+  `).join('');
+}
+
+const chatGifBtn = $('chat-gif-btn');
+if (chatGifBtn && chatGifDrawer) {
+  chatGifBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (chatEmojiDrawer) chatEmojiDrawer.hidden = true;
+    const isOpen = !chatGifDrawer.hidden;
+    chatGifDrawer.hidden = isOpen;
+    if (!isOpen) {
+      renderGifGrid(chatGifSearchInput ? chatGifSearchInput.value : '');
+      setTimeout(() => {
+        if (chatGifSearchInput && !('ontouchstart' in window)) {
+          chatGifSearchInput.focus();
+        }
+      }, 100);
+    }
+  });
+}
+
+if (chatGifCloseBtn && chatGifDrawer) {
+  chatGifCloseBtn.addEventListener('click', () => {
+    chatGifDrawer.hidden = true;
+  });
+}
+
+if (chatGifCatPills) {
+  chatGifCatPills.addEventListener('click', (e) => {
+    const pill = e.target.closest('.chat-gif-cat-pill');
+    if (!pill) return;
+    chatGifCatPills.querySelectorAll('.chat-gif-cat-pill').forEach(p => p.classList.remove('is-active'));
+    pill.classList.add('is-active');
+    activeGifCategory = pill.getAttribute('data-cat') || 'all';
+    renderGifGrid(chatGifSearchInput ? chatGifSearchInput.value : '');
+  });
+}
+
+if (chatGifSearchInput) {
+  chatGifSearchInput.addEventListener('input', () => {
+    const val = chatGifSearchInput.value.trim();
+    if (chatGifSearchClear) chatGifSearchClear.hidden = !val;
+    renderGifGrid(val);
+  });
+}
+
+if (chatGifSearchClear && chatGifSearchInput) {
+  chatGifSearchClear.addEventListener('click', () => {
+    chatGifSearchInput.value = '';
+    chatGifSearchClear.hidden = true;
+    renderGifGrid('');
+    chatGifSearchInput.focus();
+  });
+}
+
+if (chatGifGrid) {
+  chatGifGrid.addEventListener('click', (e) => {
+    const item = e.target.closest('.chat-gif-item');
+    if (!item) return;
+    const url = item.getAttribute('data-gif-url');
+    const title = item.getAttribute('data-gif-title') || 'GIF Reaction';
+    if (url) {
+      setMediaAttachment('gif', url, title);
+    }
+  });
+}
+
+// ==========================================================================
+// Phone Emoji Keyboard Drawer & Native Phone Keyboard Focus
+// ==========================================================================
+const EMOJI_SETS = {
+  all: ['🚌', '🌧️', '🎵', '❤️', '👋', '😂', '😍', '🚍', '✨', '👍', '☕', '🔥', '🥰', '🙏', '🎧', '📻', '💃', '🌴', '🥳', '😎', '💖', '🙌', '💯', '😴', '🤩', '🚗', '🛵', '🛤️', '🎫', '🤝'],
+  travel: ['🚌', '🚍', '🌧️', '☔', '☕', '🌴', '🛤️', '🎫', '🚏', '⛰️', '🚗', '🛵', '🧳', '🛣️', '🍃', '🌊', '🌅', '🛺', '🚦', '⛽'],
+  smileys: ['😀', '😂', '🤣', '😍', '🥰', '😎', '🥳', '🤩', '😴', '🤗', '🤔', '😋', '🥺', '😌', '😜', '😇', '🤫', '🤭', '🤤', '🤠'],
+  music: ['🎵', '🎶', '📻', '🎧', '✨', '🔥', '💃', '🕺', '🎸', '🎤', '🥁', '🎷', '🎹', '🔊', '🌟', '🎛️', '🎺', '🎻', '🎙️', '🎉'],
+  hearts: ['❤️', '💖', '💕', '💘', '💓', '💗', '💞', '💝', '💙', '💜', '💚', '💛', '🧡', '🤍', '🤎', '❣️', '💌', '🌹', '💐', '✨'],
+  gestures: ['👍', '👋', '🙏', '👏', '🙌', '🤝', '✌️', '👌', '🤞', '💪', '🤙', '✊', '👊', '🫡', '💯', '☝️', '👉', '👈', '🤌', '🫶']
+};
+
+let activeEmojiCategory = 'all';
+
+function renderEmojiGrid() {
+  if (!chatEmojiGrid) return;
+  const emojis = EMOJI_SETS[activeEmojiCategory] || EMOJI_SETS.all;
+  chatEmojiGrid.innerHTML = emojis.map((em) => `
+    <button type="button" class="chat-emoji-item" data-emoji="${em}" aria-label="Insert ${em}">${em}</button>
+  `).join('');
+}
+
+const chatEmojiBtn = $('chat-emoji-btn');
+if (chatEmojiBtn && chatEmojiDrawer) {
+  chatEmojiBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (chatGifDrawer) chatGifDrawer.hidden = true;
+    const isOpen = !chatEmojiDrawer.hidden;
+    chatEmojiDrawer.hidden = isOpen;
+    if (!isOpen) {
+      renderEmojiGrid();
+    }
+    // Focus input so phone's native virtual keyboard opens
+    if (chatMessageInput) {
+      chatMessageInput.focus();
+    }
+  });
+}
+
+if (chatEmojiCloseBtn && chatEmojiDrawer) {
+  chatEmojiCloseBtn.addEventListener('click', () => {
+    chatEmojiDrawer.hidden = true;
+  });
+}
+
+if (chatEmojiCats) {
+  chatEmojiCats.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chat-emoji-cat-btn');
+    if (!btn) return;
+    chatEmojiCats.querySelectorAll('.chat-emoji-cat-btn').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    activeEmojiCategory = btn.getAttribute('data-cat') || 'all';
+    renderEmojiGrid();
+    if (chatMessageInput) chatMessageInput.focus();
+  });
+}
+
+if (chatEmojiGrid && chatMessageInput) {
+  chatEmojiGrid.addEventListener('click', (e) => {
+    const item = e.target.closest('.chat-emoji-item');
+    if (!item) return;
+    const emoji = item.getAttribute('data-emoji');
+    if (!emoji) return;
+
+    // Insert at cursor position or append
+    const start = chatMessageInput.selectionStart ?? chatMessageInput.value.length;
+    const end = chatMessageInput.selectionEnd ?? chatMessageInput.value.length;
+    const text = chatMessageInput.value;
+    chatMessageInput.value = text.slice(0, start) + emoji + text.slice(end);
+    const nextPos = start + emoji.length;
+    chatMessageInput.setSelectionRange(nextPos, nextPos);
+    chatMessageInput.focus();
+    updateChatSendButtonState();
+  });
+}
+
+// ==========================================================================
+// Apple-Style Fullscreen Media Lightbox
+// ==========================================================================
+function openChatLightbox(src) {
+  if (!chatLightbox || !chatLightboxImg || !src) return;
+  chatLightboxImg.src = src;
+  chatLightbox.hidden = false;
+}
+
+function closeChatLightbox() {
+  if (!chatLightbox) return;
+  chatLightbox.hidden = true;
+  if (chatLightboxImg) chatLightboxImg.src = '';
+}
+
+if (chatLightboxClose) {
+  chatLightboxClose.addEventListener('click', closeChatLightbox);
+}
+if (chatLightboxBackdrop) {
+  chatLightboxBackdrop.addEventListener('click', closeChatLightbox);
+}
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (chatLightbox && !chatLightbox.hidden) closeChatLightbox();
+    if (chatEmojiDrawer && !chatEmojiDrawer.hidden) chatEmojiDrawer.hidden = true;
+    if (chatGifDrawer && !chatGifDrawer.hidden) chatGifDrawer.hidden = true;
+  }
+});
+
+// Quick Reaction Chips Wiring
 const quickChipsContainer = $('chat-quick-chips');
 if (quickChipsContainer) {
   quickChipsContainer.addEventListener('click', (e) => {
@@ -2573,37 +2970,10 @@ if (quickChipsContainer) {
     if (!chipText || !chatMessageInput) return;
 
     chatMessageInput.value = chipText;
-    if (chatSendBtn) chatSendBtn.disabled = false;
+    updateChatSendButtonState();
     if (chatForm) {
       chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
     }
-  });
-}
-
-const chatEmojiBtn = $('chat-emoji-btn');
-if (chatEmojiBtn && chatMessageInput) {
-  const passengerEmojis = ['🚌', '🎵', '🌧️', '😍', '❤️', '🚍', '✨', '👋'];
-  let emojiCycleIndex = 0;
-  chatEmojiBtn.addEventListener('click', () => {
-    const emoji = passengerEmojis[emojiCycleIndex % passengerEmojis.length];
-    emojiCycleIndex++;
-    chatMessageInput.value = chatMessageInput.value ? `${chatMessageInput.value} ${emoji}` : emoji;
-    chatMessageInput.focus();
-    if (chatSendBtn) chatSendBtn.disabled = false;
-  });
-}
-
-const chatImgBtn = $('chat-img-btn');
-if (chatImgBtn) {
-  chatImgBtn.addEventListener('click', () => {
-    notify('Photo sharing is coming soon aboard KSRTC Radio! 📷✨');
-  });
-}
-
-const chatGifBtn = $('chat-gif-btn');
-if (chatGifBtn) {
-  chatGifBtn.addEventListener('click', () => {
-    notify('GIF reactions coming in the next station stop! 🎞️🚍');
   });
 }
 
@@ -2619,6 +2989,3 @@ if (chatOptionsBtn) {
     }
   });
 }
-
-
-
