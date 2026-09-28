@@ -885,6 +885,12 @@ button { color:inherit; cursor:pointer; }
     gap: 6px;
     font-size: 12px;
   }
+  .chat-toggle .chat-unread-dot {
+    top: 5.5px;
+    right: 8px;
+    width: 7px;
+    height: 7px;
+  }
 }
 @media (max-width: 640px) {
   .playlist-drawer-wrap {
@@ -928,6 +934,12 @@ button { color:inherit; cursor:pointer; }
   .playlist-toggle {
     padding: 6px 9px;
   }
+  .chat-toggle .chat-unread-dot {
+    top: 4.5px;
+    right: 5.5px;
+    width: 6.5px;
+    height: 6.5px;
+  }
 }
 
 /* ==========================================================================
@@ -938,15 +950,19 @@ button { color:inherit; cursor:pointer; }
 }
 .chat-unread-dot {
   position: absolute;
-  top: 4px;
-  right: 5px;
-  width: 7.5px;
-  height: 7.5px;
+  top: 7px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 6px #10b981, 0 0 12px rgba(16, 185, 129, 0.85);
-  border: 1px solid rgba(0, 0, 0, 0.6);
+  background: radial-gradient(circle at 35% 35%, #86efac 0%, #10b981 55%, #059669 100%);
+  box-shadow: 
+    0 0 0 1.5px rgba(20, 22, 18, 0.95),
+    0 0 6px rgba(16, 185, 129, 0.95),
+    0 0 12px rgba(16, 185, 129, 0.45);
   pointer-events: none;
+  z-index: 2;
+  transition: opacity .2s ease, transform .2s ease;
 }
 .chat-unread-dot[hidden] {
   display: none !important;
@@ -1097,8 +1113,9 @@ button { color:inherit; cursor:pointer; }
 }
 
 .chat-system-note {
+  position: relative;
   margin: 10px 16px 2px;
-  padding: 10px 13px;
+  padding: 10px 34px 10px 13px;
   border-radius: 12px;
   background: rgba(245, 200, 113, 0.08);
   border-left: 3.5px solid #f5c871;
@@ -1109,6 +1126,41 @@ button { color:inherit; cursor:pointer; }
   -webkit-backdrop-filter: blur(16px);
   flex-shrink: 0;
   box-sizing: border-box;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.chat-system-note[hidden] {
+  display: none !important;
+}
+.chat-system-note-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 200, 113, 0.28);
+  background: rgba(30, 26, 20, 0.65);
+  color: rgba(245, 200, 113, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: all .18s ease;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 2;
+}
+.chat-system-note-close:hover {
+  background: rgba(245, 200, 113, 0.25);
+  color: #fff;
+  border-color: rgba(245, 200, 113, 0.6);
+  transform: scale(1.08);
+}
+.chat-system-note-close:active {
+  transform: scale(0.92);
 }
 .chat-system-note-title {
   display: flex;

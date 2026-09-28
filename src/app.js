@@ -1350,6 +1350,8 @@ const chatForm = $('chat-form');
 const chatMessageInput = $('chat-message-input');
 const chatSendBtn = $('chat-send-btn');
 const chatUnreadDot = $('chat-unread-dot');
+const chatSystemNote = $('chat-system-note');
+const chatSystemNoteClose = $('chat-system-note-close');
 const chatPopBubble = $('chat-pop-bubble');
 const chatPopSender = $('chat-pop-sender');
 const chatPopText = $('chat-pop-text');
@@ -1366,6 +1368,7 @@ let popBubbleTimer = null;
 let popBubbleFadeTimer = null;
 const CHAT_USERNAME_KEY = 'ksrtc_chat_passenger_name';
 const CHAT_GENDER_KEY = 'ksrtc_chat_passenger_gender';
+const CHAT_NOTE_DISMISSED_KEY = 'ksrtc_chat_note_dismissed';
 
 function getStoredOrRandomGender() {
   try {
@@ -1511,6 +1514,29 @@ if (chatPopBubble) {
   });
 }
 
+// Station Welcome & Guidelines Note dismissal handling
+if (chatSystemNote) {
+  try {
+    if (localStorage.getItem(CHAT_NOTE_DISMISSED_KEY) === 'true') {
+      chatSystemNote.hidden = true;
+    }
+  } catch (e) {}
+
+  if (chatSystemNoteClose) {
+    chatSystemNoteClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      chatSystemNote.style.opacity = '0';
+      chatSystemNote.style.transform = 'translateY(-4px) scale(0.98)';
+      setTimeout(() => {
+        chatSystemNote.hidden = true;
+      }, 200);
+      try {
+        localStorage.setItem(CHAT_NOTE_DISMISSED_KEY, 'true');
+      } catch (err) {}
+    });
+  }
+}
+
 function isChatOpen() {
   return Boolean(chatDrawerWrap && chatDrawerWrap.classList.contains('is-open'));
 }
@@ -1525,6 +1551,10 @@ function openChatDrawer() {
   void chatDrawerWrap.offsetWidth;
   chatDrawerWrap.classList.add('is-open');
   if (chatToggle) chatToggle.setAttribute('aria-expanded', 'true');
+
+  if (chatUnreadDot) {
+    chatUnreadDot.hidden = true;
+  }
 
   if (chatMessagesContainer) {
     chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
@@ -2000,6 +2030,13 @@ function initLiveSessionsAndChat() {
     // Trigger 2-second popping message on top of the song slider for live messages!
     if (isLive) {
       triggerSongPoppingMessage(senderName, text, tagColor, isVerified, gender);
+    }
+
+    // Trigger glowing green dot for unread messages if chat drawer is currently closed
+    if (isLive && !isChatOpen() && !isMe) {
+      if (chatUnreadDot) {
+        chatUnreadDot.hidden = false;
+      }
     }
   }
 
