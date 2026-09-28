@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=35" />
+    <link rel="stylesheet" href="./src/styles.css?v=36" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -470,7 +470,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <button type="button" class="chat-emoji-cat-btn" data-cat="hearts" title="Hearts & Love">❤️</button>
                 <button type="button" class="chat-emoji-cat-btn" data-cat="gestures" title="Hands & Gestures">👍</button>
               </div>
-              <button type="button" class="chat-shelf-close-btn" id="chat-emoji-close-btn" aria-label="Close emoji picker" title="Close">✕</button>
+              <div class="chat-shelf-header-actions">
+                <button type="button" class="chat-shelf-kb-btn" id="chat-emoji-kb-btn" title="Open Phone Keyboard" aria-label="Open Phone Keyboard">⌨️ Phone</button>
+                <button type="button" class="chat-shelf-close-btn" id="chat-emoji-close-btn" aria-label="Close emoji picker" title="Close">✕</button>
+              </div>
             </div>
             <div class="chat-emoji-grid" id="chat-emoji-grid" role="listbox">
               <!-- Populated dynamically by app.js -->
@@ -508,7 +511,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <!-- Media Attachment Preview Bar -->
           <div class="chat-attachment-bar" id="chat-attachment-bar" hidden aria-label="Attached media preview">
             <div class="chat-attachment-preview-box">
-              <img id="chat-attachment-thumb" src="" alt="Attached media" />
+              <img id="chat-attachment-thumb" src="" alt="Attached media" referrerpolicy="no-referrer" />
               <span class="chat-attachment-badge" id="chat-attachment-badge">PHOTO</span>
             </div>
             <div class="chat-attachment-details">
@@ -575,11 +578,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <div class="chat-lightbox-backdrop" id="chat-lightbox-backdrop"></div>
         <div class="chat-lightbox-dialog">
           <button type="button" class="chat-lightbox-close" id="chat-lightbox-close" aria-label="Close preview" title="Close">✕</button>
-          <img id="chat-lightbox-img" class="chat-lightbox-img" src="" alt="Enlarged media" />
+          <img id="chat-lightbox-img" class="chat-lightbox-img" src="" alt="Enlarged media" referrerpolicy="no-referrer" />
         </div>
       </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=43"></script>
+    <script type="module" src="./src/app.js?v=44"></script>
   </body>
 </html>

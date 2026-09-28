@@ -2163,17 +2163,21 @@ function initLiveSessionsAndChat() {
     if (data.imageUrl) {
       mediaHtml += `
         <div class="chat-msg-media-wrap" data-img-src="${escapeHtml(data.imageUrl)}" title="Tap to expand photo">
-          <img class="chat-msg-media-img" src="${escapeHtml(data.imageUrl)}" alt="Shared photo" loading="lazy" />
+          <img class="chat-msg-media-img" src="${escapeHtml(data.imageUrl)}" alt="Shared photo" loading="lazy" referrerpolicy="no-referrer" />
         </div>
       `;
     }
     if (data.gifUrl) {
       mediaHtml += `
         <div class="chat-msg-media-wrap chat-msg-gif-wrap" data-img-src="${escapeHtml(data.gifUrl)}" title="Tap to expand GIF">
-          <img class="chat-msg-media-img chat-msg-gif-img" src="${escapeHtml(data.gifUrl)}" alt="Shared GIF" loading="lazy" />
+          <img class="chat-msg-media-img chat-msg-gif-img" src="${escapeHtml(data.gifUrl)}" alt="Shared GIF" loading="lazy" referrerpolicy="no-referrer" />
+          <span class="chat-msg-gif-badge">GIF</span>
         </div>
       `;
     }
+
+    const hasMedia = Boolean(data.imageUrl || data.gifUrl);
+    const isMediaOnly = hasMedia && !text && !replyQuoteHtml && !adminBannerHtml;
 
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg-row ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''} is-gender-${gender.toLowerCase()}`;
@@ -2188,7 +2192,7 @@ function initLiveSessionsAndChat() {
           <span class="chat-msg-sender" style="color: ${tagColor};">${senderHtml}</span>
           <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
         </div>
-        <div class="chat-msg-bubble">
+        <div class="chat-msg-bubble ${isMediaOnly ? 'is-media-only' : ''}">
           ${adminBannerHtml}
           ${replyQuoteHtml}
           ${mediaHtml}
@@ -2763,7 +2767,7 @@ function renderGifGrid(filterText = '') {
 
   chatGifGrid.innerHTML = filtered.map((g) => `
     <div class="chat-gif-item" data-gif-url="${escapeHtml(g.url)}" data-gif-title="${escapeHtml(g.title)}" title="${escapeHtml(g.title)}">
-      <img src="${escapeHtml(g.url)}" alt="${escapeHtml(g.title)}" loading="lazy" />
+      <img src="${escapeHtml(g.url)}" alt="${escapeHtml(g.title)}" loading="lazy" referrerpolicy="no-referrer" />
       <span class="chat-gif-item-title">${escapeHtml(g.title)}</span>
     </div>
   `).join('');
@@ -2865,10 +2869,14 @@ if (chatEmojiBtn && chatEmojiDrawer) {
     if (!isOpen) {
       renderEmojiGrid();
     }
-    // Focus input so phone's native virtual keyboard opens
-    if (chatMessageInput) {
-      chatMessageInput.focus();
-    }
+  });
+}
+
+const chatEmojiKbBtn = $('chat-emoji-kb-btn');
+if (chatEmojiKbBtn) {
+  chatEmojiKbBtn.addEventListener('click', () => {
+    if (chatEmojiDrawer) chatEmojiDrawer.hidden = true;
+    if (chatMessageInput) chatMessageInput.focus();
   });
 }
 
@@ -2886,7 +2894,6 @@ if (chatEmojiCats) {
     btn.classList.add('is-active');
     activeEmojiCategory = btn.getAttribute('data-cat') || 'all';
     renderEmojiGrid();
-    if (chatMessageInput) chatMessageInput.focus();
   });
 }
 
@@ -2904,7 +2911,9 @@ if (chatEmojiGrid && chatMessageInput) {
     chatMessageInput.value = text.slice(0, start) + emoji + text.slice(end);
     const nextPos = start + emoji.length;
     chatMessageInput.setSelectionRange(nextPos, nextPos);
-    chatMessageInput.focus();
+    if (!('ontouchstart' in window)) {
+      chatMessageInput.focus();
+    }
     updateChatSendButtonState();
   });
 }
