@@ -1521,11 +1521,13 @@ function triggerSongPoppingMessage(senderName, text, color, isVerified = false, 
     : '';
 
   if (isVerified) {
-    chatPopSender.innerHTML = `<span class="chat-sender-name">${escapeHtml(senderName)}</span>${genderHtml}${replyHtml} ${VERIFIED_TICK_SVG}`;
+    chatPopSender.innerHTML = `<span class="chat-sender-name chat-admin-sender-name">👑 ${escapeHtml(senderName)}</span>${genderHtml}${replyHtml} ${VERIFIED_TICK_SVG} <span class="chat-admin-pill-tag">OFFICIAL</span>`;
+    chatPopBubble.classList.add('is-admin-pop');
   } else {
     chatPopSender.innerHTML = `<span class="chat-sender-name">${escapeHtml(senderName)}</span>${genderHtml}${replyHtml}`;
+    chatPopBubble.classList.remove('is-admin-pop');
   }
-  chatPopSender.style.color = color;
+  chatPopSender.style.color = isVerified ? '#f5c871' : color;
   chatPopText.textContent = text;
 
   chatPopBubble.classList.remove('is-leaving');
@@ -1541,6 +1543,7 @@ function triggerSongPoppingMessage(senderName, text, color, isVerified = false, 
     popBubbleFadeTimer = setTimeout(() => {
       chatPopBubble.hidden = true;
       chatPopBubble.classList.remove('is-leaving');
+      chatPopBubble.classList.remove('is-admin-pop');
     }, 240);
   }, 2000);
 }
@@ -2043,33 +2046,19 @@ function initLiveSessionsAndChat() {
       likeBtn.classList.toggle('has-liked', Boolean(hasLiked));
       const iconEl = likeBtn.querySelector('.chat-pill-icon');
       if (iconEl) {
-        iconEl.textContent = hasLiked ? '❤️' : (count > 0 ? '❤️' : '🤍');
+        iconEl.textContent = (hasLiked || count > 0) ? '❤️' : '🤍';
       }
       const countEl = likeBtn.querySelector('.chat-pill-count, .chat-like-count');
       if (countEl) {
-        countEl.textContent = count > 0 ? String(count) : '';
+        countEl.textContent = count > 0 ? String(count) : 'Like';
       }
     }
 
+    // Never display double time: remove any tapback badge from bubble
     const bubble = msgEl.querySelector('.chat-msg-bubble');
     if (bubble) {
-      let tapback = bubble.querySelector('.chat-tapback-badge');
-      if (count > 0) {
-        if (!tapback) {
-          tapback = document.createElement('div');
-          tapback.className = `chat-tapback-badge ${hasLiked ? 'is-liked' : ''}`;
-          tapback.dataset.id = msgId;
-          tapback.innerHTML = `<span class="tapback-emoji">❤️</span><span class="tapback-count">${count}</span>`;
-          bubble.appendChild(tapback);
-        } else {
-          const cEl = tapback.querySelector('.tapback-count');
-          if (cEl) cEl.textContent = String(count);
-          tapback.classList.toggle('is-liked', Boolean(hasLiked));
-        }
-        tapback.title = `${count} Like${count > 1 ? 's' : ''}`;
-      } else if (tapback) {
-        tapback.remove();
-      }
+      const tapback = bubble.querySelector('.chat-tapback-badge');
+      if (tapback) tapback.remove();
     }
   }
 
@@ -2126,8 +2115,16 @@ function initLiveSessionsAndChat() {
     const genderHtml = `<span class="chat-gender-tag gender-${gender.toLowerCase()}" title="${gender === 'M' ? 'Male' : 'Female'}">${escapeHtml(gender)}</span>`;
 
     const senderHtml = isVerified
-      ? `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${genderHtml} ${VERIFIED_TICK_SVG}`
+      ? `<span class="chat-sender-name chat-admin-sender-name">👑 ${escapeHtml(senderName)}</span> ${genderHtml} ${VERIFIED_TICK_SVG} <span class="chat-admin-pill-tag">OFFICIAL</span>`
       : `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${genderHtml}`;
+
+    const adminBannerHtml = isVerified
+      ? `<div class="chat-admin-bubble-banner">
+          <span class="chat-admin-banner-shield">🛡️</span>
+          <span class="chat-admin-banner-label">OFFICIAL ANNOUNCEMENT</span>
+          <span class="chat-admin-banner-sparkle">✦</span>
+        </div>`
+      : '';
 
     let replyQuoteHtml = '';
     if (data.replyTo && data.replyTo.name) {
@@ -2192,21 +2189,19 @@ function initLiveSessionsAndChat() {
           <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
         </div>
         <div class="chat-msg-bubble">
+          ${adminBannerHtml}
           ${replyQuoteHtml}
           ${mediaHtml}
           ${text ? `<div class="chat-msg-text">${escapeHtml(text)}</div>` : ''}
         </div>
         <div class="chat-msg-actions">
           <button type="button" class="chat-pill-btn chat-like-btn ${hasLiked ? 'has-liked' : ''}" data-id="${escapeHtml(msgId)}" title="Like message" aria-label="Like message">
-            <span class="chat-pill-icon">${hasLiked ? '❤️' : (likeCount > 0 ? '❤️' : '🤍')}</span>
-            <span class="chat-pill-count">${likeCount > 0 ? likeCount : ''}</span>
+            <span class="chat-pill-icon">${(hasLiked || likeCount > 0) ? '❤️' : '🤍'}</span>
+            <span class="chat-pill-count">${likeCount > 0 ? likeCount : 'Like'}</span>
           </button>
           <button type="button" class="chat-pill-btn chat-reply-btn" data-id="${escapeHtml(msgId)}" title="Reply to message" aria-label="Reply to message">
             <span class="chat-pill-icon">↰</span>
             <span>Reply</span>
-          </button>
-          <button type="button" class="chat-pill-btn chat-more-btn" data-id="${escapeHtml(msgId)}" title="Options" aria-label="Options">
-            <span>•••</span>
           </button>
           <div class="chat-admin-actions">
             <button type="button" class="chat-admin-action-btn chat-pin-btn" data-id="${escapeHtml(msgId)}" title="Pin message" aria-label="Pin message">
@@ -2270,8 +2265,8 @@ function initLiveSessionsAndChat() {
         return;
       }
 
-      // 1. Like button or Tapback badge click
-      const likeTrigger = e.target.closest('.chat-like-btn, .chat-tapback-badge');
+      // 1. Like button click
+      const likeTrigger = e.target.closest('.chat-like-btn');
       if (likeTrigger) {
         const msgId = likeTrigger.getAttribute('data-id');
         if (msgId) {
@@ -2294,23 +2289,6 @@ function initLiveSessionsAndChat() {
           const text = msgEl.querySelector('.chat-msg-text')?.textContent || '';
           const senderColor = msgEl.querySelector('.chat-msg-sender')?.style.color || '#38bdf8';
           setReplyingTo({ id: msgId, name: senderName, text, color: senderColor });
-        }
-        return;
-      }
-
-      // 3. More options (•••) button click
-      const moreBtn = e.target.closest('.chat-more-btn');
-      if (moreBtn) {
-        const msgId = moreBtn.getAttribute('data-id');
-        const msgEl = moreBtn.closest('.chat-msg-row, .chat-msg');
-        if (msgEl) {
-          const adminActions = msgEl.querySelector('.chat-admin-actions');
-          if (isAdminVerified && adminActions) {
-            adminActions.style.display = adminActions.style.display === 'inline-flex' ? 'none' : 'inline-flex';
-          } else {
-            // Friendly passenger tap
-            notify('Like or reply to connect with this passenger! 🚌💬');
-          }
         }
         return;
       }

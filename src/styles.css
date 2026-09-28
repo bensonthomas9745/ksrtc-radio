@@ -1513,11 +1513,176 @@ button { color:inherit; cursor:pointer; }
   border-color: rgba(225, 29, 72, 0.25);
 }
 
-/* Admin / Conductor warm amber tint matching mockup */
+/* ==========================================================================
+   OFFICIAL ADMIN VIP MESSAGE SKIN & RADIANT GLOW
+   ========================================================================== */
+
+/* 1. Admin Avatar Halo & Floating Crown */
+.chat-msg-row.is-admin-msg .chat-avatar-wrap {
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 0 0 2px #f59e0b, 0 0 16px rgba(245, 158, 11, 0.7);
+  animation: admin-avatar-pulse 3s ease-in-out infinite alternate;
+}
+.chat-msg-row.is-admin-msg .chat-avatar-wrap::after {
+  content: "👑";
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  font-size: 13px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.9));
+  transform: rotate(12deg);
+  animation: admin-crown-tilt 3s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes admin-avatar-pulse {
+  0% { box-shadow: 0 0 0 2px #f59e0b, 0 0 12px rgba(245, 158, 11, 0.5); }
+  100% { box-shadow: 0 0 0 2.5px #fbbf24, 0 0 22px rgba(251, 191, 36, 0.85); }
+}
+
+@keyframes admin-crown-tilt {
+  0% { transform: rotate(8deg) scale(0.98); }
+  100% { transform: rotate(16deg) scale(1.08); }
+}
+
+/* 2. Admin Sender Name & Official Tag */
+.chat-admin-sender-name {
+  background: linear-gradient(135deg, #fffbeb 0%, #fde047 35%, #f59e0b 70%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  filter: drop-shadow(0 1px 3px rgba(245, 158, 11, 0.4));
+}
+.chat-admin-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1.5px 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  color: #1a0f00;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+  line-height: 1.2;
+}
+
+/* 3. Special Admin Message Bubble: Luxury Amber-Gold Obsidian Background, Glowing Edge & Aura */
 .chat-msg-row.is-admin-msg .chat-msg-bubble {
-  background: linear-gradient(135deg, rgba(180, 83, 9, 0.35) 0%, #20242c 100%);
-  border-color: rgba(245, 200, 113, 0.35);
-  box-shadow: 0 4px 18px rgba(245, 200, 113, 0.12);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.28) 0%, rgba(180, 83, 9, 0.22) 28%, rgba(20, 24, 33, 0.98) 65%, rgba(245, 158, 11, 0.16) 100%);
+  border: 1.5px solid rgba(251, 191, 36, 0.75);
+  border-left: 4.5px solid #f59e0b;
+  border-radius: 6px 18px 18px 18px;
+  box-shadow:
+    0 6px 26px -2px rgba(245, 158, 11, 0.45),
+    0 0 22px rgba(251, 191, 36, 0.26),
+    inset 0 1px 1px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 3px rgba(245, 158, 11, 0.22);
+  position: relative;
+  overflow: hidden;
+  animation: admin-bubble-aura 3s ease-in-out infinite alternate;
+}
+
+/* Shimmering Gold Top Accent Line */
+.chat-msg-row.is-admin-msg .chat-msg-bubble::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #f59e0b 0%, #fef08a 40%, #f59e0b 80%, transparent 100%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+@keyframes admin-bubble-aura {
+  0% {
+    box-shadow:
+      0 6px 20px -2px rgba(245, 158, 11, 0.38),
+      0 0 14px rgba(251, 191, 36, 0.2),
+      inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    border-color: rgba(251, 191, 36, 0.65);
+  }
+  100% {
+    box-shadow:
+      0 8px 32px -1px rgba(245, 158, 11, 0.65),
+      0 0 28px rgba(251, 191, 36, 0.45),
+      inset 0 1px 2px rgba(255, 255, 255, 0.52);
+    border-color: rgba(254, 240, 138, 0.95);
+  }
+}
+
+/* 4. Official Notice Banner inside Admin Bubble */
+.chat-admin-bubble-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  margin-bottom: 7px;
+  background: rgba(245, 158, 11, 0.16);
+  border: 0.5px solid rgba(251, 191, 36, 0.35);
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #fde047;
+  text-transform: uppercase;
+}
+.chat-admin-banner-shield {
+  font-size: 12px;
+  line-height: 1;
+}
+.chat-admin-banner-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-admin-banner-sparkle {
+  color: #fbbf24;
+  font-size: 11px;
+  animation: admin-sparkle 2s ease-in-out infinite alternate;
+}
+@keyframes admin-sparkle {
+  0% { opacity: 0.5; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
+/* 5. Admin Message Text: High clarity, warm contrast */
+.chat-msg-row.is-admin-msg .chat-msg-text {
+  color: #fffef7;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* 6. Admin Action Pills */
+.chat-msg-row.is-admin-msg .chat-pill-btn {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fde68a;
+}
+.chat-msg-row.is-admin-msg .chat-pill-btn:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #ffffff;
+}
+
+/* 7. Live Song Popping Banner for Admin */
+.chat-pop-bubble.is-admin-pop {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(20, 24, 33, 0.98) 100%) !important;
+  border-color: rgba(251, 191, 36, 0.85) !important;
+  box-shadow: 0 8px 28px rgba(245, 158, 11, 0.45), 0 0 20px rgba(251, 191, 36, 0.35) !important;
 }
 
 .chat-msg-row.is-highlighted .chat-msg-bubble,
@@ -1595,11 +1760,11 @@ button { color:inherit; cursor:pointer; }
 .chat-pill-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 999px;
-  padding: 3px 9px;
+  padding: 3.5px 10px;
   font-size: 11.5px;
   font-weight: 600;
   color: #94a3b8;
@@ -1618,18 +1783,20 @@ button { color:inherit; cursor:pointer; }
   transform: scale(0.95);
 }
 .chat-pill-btn.chat-like-btn.has-liked {
-  background: rgba(244, 63, 94, 0.2);
-  border-color: rgba(244, 63, 94, 0.5);
+  background: rgba(244, 63, 94, 0.22);
+  border-color: rgba(244, 63, 94, 0.55);
   color: #fecdd3;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.25);
 }
-.chat-pill-count:empty {
-  display: none;
+.chat-pill-count {
+  font-size: 11.5px;
+  font-weight: 600;
 }
 .chat-admin-actions {
   display: none;
   align-items: center;
   gap: 4px;
-  margin-left: 4px;
+  margin-left: 3px;
 }
 .is-admin-mode .chat-admin-actions {
   display: inline-flex;
@@ -1638,8 +1805,8 @@ button { color:inherit; cursor:pointer; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
@@ -1652,6 +1819,7 @@ button { color:inherit; cursor:pointer; }
 .chat-admin-action-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
+  transform: scale(1.08);
 }
 .chat-admin-action-btn.chat-pin-btn:hover {
   background: rgba(56, 189, 248, 0.25);
