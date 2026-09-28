@@ -1355,6 +1355,16 @@ const chatSystemNoteClose = $('chat-system-note-close');
 const chatPopBubble = $('chat-pop-bubble');
 const chatPopSender = $('chat-pop-sender');
 const chatPopText = $('chat-pop-text');
+const chatReplyBar = $('chat-reply-bar');
+const chatReplyBarAccent = $('chat-reply-bar-accent');
+const chatReplyBarTitle = $('chat-reply-bar-title');
+const chatReplyBarSnippet = $('chat-reply-bar-snippet');
+const chatReplyCancelBtn = $('chat-reply-cancel-btn');
+
+let currentReplyTo = null;
+let toggleLikeChatMessageFn = null;
+const localLikedMsgIds = new Set();
+const likeListenerUnsubs = new Map();
 
 let chatDrawerCloseTimer = null;
 let lastChatMessageTime = 0;
@@ -1472,7 +1482,7 @@ function getPassengerColor(name) {
 /* ==========================================================================
    Apple-Style Pop-up Message Balloon (Floats on top of the song slider)
    ========================================================================== */
-function triggerSongPoppingMessage(senderName, text, color, isVerified = false, gender = '') {
+function triggerSongPoppingMessage(senderName, text, color, isVerified = false, gender = '', replyTo = null) {
   if (!chatPopBubble || !chatPopSender || !chatPopText) return;
   if (!senderName || senderName.toLowerCase() === 'system') return;
 
@@ -1483,10 +1493,14 @@ function triggerSongPoppingMessage(senderName, text, color, isVerified = false, 
     ? ` <span class="chat-gender-tag gender-${gender.toLowerCase()}">${gender}</span>`
     : '';
 
+  const replyHtml = (replyTo && replyTo.name)
+    ? ` <span class="chat-pop-reply-tag">↳ ${escapeHtml(replyTo.name)}</span>`
+    : '';
+
   if (isVerified) {
-    chatPopSender.innerHTML = `<span class="chat-sender-name">${escapeHtml(senderName)}</span>${genderHtml} ${VERIFIED_TICK_SVG}`;
+    chatPopSender.innerHTML = `<span class="chat-sender-name">${escapeHtml(senderName)}</span>${genderHtml}${replyHtml} ${VERIFIED_TICK_SVG}`;
   } else {
-    chatPopSender.innerHTML = `<span class="chat-sender-name">${escapeHtml(senderName)}</span>${genderHtml}`;
+    chatPopSender.innerHTML = `<span class="chat-sender-name">${escapeHtml(senderName)}</span>${genderHtml}${replyHtml}`;
   }
   chatPopSender.style.color = color;
   chatPopText.textContent = text;
@@ -1720,6 +1734,43 @@ if (genderSelector) {
 }
 updateGenderUI();
 
+function setReplyingTo(replyData) {
+  if (!replyData) return;
+  currentReplyTo = replyData;
+  if (chatReplyBar && chatReplyBarTitle && chatReplyBarSnippet) {
+    chatReplyBarTitle.textContent = `Replying to ${replyData.name || 'Passenger'}`;
+    chatReplyBarSnippet.textContent = (replyData.text || '').slice(0, 75);
+    if (chatReplyBarAccent) {
+      chatReplyBarAccent.style.background = replyData.color || '#38bdf8';
+    }
+    chatReplyBar.hidden = false;
+  }
+  if (chatMessageInput) {
+    chatMessageInput.placeholder = `Reply to ${replyData.name || 'Passenger'}…`;
+    chatMessageInput.focus();
+  }
+}
+
+function clearReplyingTo() {
+  currentReplyTo = null;
+  if (chatReplyBar) {
+    chatReplyBar.hidden = true;
+  }
+  if (chatMessageInput) {
+    chatMessageInput.placeholder = 'Say something aboard KSRTC…';
+  }
+}
+
+if (chatReplyCancelBtn) {
+  chatReplyCancelBtn.addEventListener('click', clearReplyingTo);
+}
+
+if (chatMessageInput && chatSendBtn) {
+  chatMessageInput.addEventListener('input', () => {
+    chatSendBtn.disabled = !chatMessageInput.value.trim();
+  });
+}
+
 if (chatForm && chatMessageInput) {
   chatForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1754,15 +1805,22 @@ if (chatForm && chatMessageInput) {
 
     lastChatMessageTime = now;
 
-    sendChatMessageFn(activeName.slice(0, 24), text, isAdminVerified, currentChatGender)
+    const replyPayload = currentReplyTo ? {
+      id: currentReplyTo.id || '',
+      name: currentReplyTo.name || 'Passenger',
+      text: (currentReplyTo.text || '').slice(0, 80)
+    } : null;
+
+    sendChatMessageFn(activeName.slice(0, 24), text, isAdminVerified, currentChatGender, replyPayload)
       .then(() => {
         chatMessageInput.value = '';
-        if (chatSendBtn) chatSendBtn.disabled = false;
+        if (chatSendBtn) chatSendBtn.disabled = true;
+        clearReplyingTo();
         chatMessageInput.focus();
       })
       .catch((err) => {
         console.warn('Chat send error:', err);
-        if (chatSendBtn) chatSendBtn.disabled = false;
+        if (chatSendBtn) chatSendBtn.disabled = !chatMessageInput.value.trim();
         notify('Unable to send message right now.');
       });
   });
@@ -1939,6 +1997,57 @@ function initLiveSessionsAndChat() {
     card.hidden = false;
   }
 
+  function updateMessageLikeUI(msgId, count, hasLiked) {
+    if (!chatMessagesContainer) return;
+    const msgEl = chatMessagesContainer.querySelector(`.chat-msg[data-id="${msgId}"]`);
+    if (!msgEl) return;
+
+    const likeBtn = msgEl.querySelector('.chat-like-btn');
+    if (likeBtn) {
+      likeBtn.classList.toggle('has-liked', Boolean(hasLiked));
+      const countEl = likeBtn.querySelector('.chat-like-count');
+      if (countEl) {
+        countEl.textContent = count > 0 ? String(count) : '';
+      }
+      const svg = likeBtn.querySelector('svg');
+      if (svg) {
+        svg.setAttribute('fill', hasLiked ? '#f43f5e' : 'none');
+        svg.setAttribute('stroke', hasLiked ? '#f43f5e' : 'currentColor');
+      }
+    }
+
+    const bubble = msgEl.querySelector('.chat-msg-bubble');
+    if (bubble) {
+      let tapback = bubble.querySelector('.chat-tapback-badge');
+      if (count > 0) {
+        if (!tapback) {
+          tapback = document.createElement('div');
+          tapback.className = `chat-tapback-badge ${hasLiked ? 'is-liked' : ''}`;
+          tapback.dataset.id = msgId;
+          tapback.innerHTML = `<span class="tapback-emoji">❤️</span><span class="tapback-count">${count}</span>`;
+          bubble.appendChild(tapback);
+        } else {
+          const cEl = tapback.querySelector('.tapback-count');
+          if (cEl) cEl.textContent = String(count);
+          tapback.classList.toggle('is-liked', Boolean(hasLiked));
+        }
+        tapback.title = `${count} Like${count > 1 ? 's' : ''}`;
+      } else if (tapback) {
+        tapback.remove();
+      }
+    }
+  }
+
+  // Initial local fallback for likes
+  toggleLikeChatMessageFn = (msgId) => {
+    const has = localLikedMsgIds.has(msgId);
+    if (has) localLikedMsgIds.delete(msgId);
+    else localLikedMsgIds.add(msgId);
+    const count = localLikedMsgIds.has(msgId) ? 1 : 0;
+    updateMessageLikeUI(msgId, count, localLikedMsgIds.has(msgId));
+    return Promise.resolve();
+  };
+
   function appendChatMessage(msgId, data, isLive = false) {
     if (!chatMessagesContainer || seenMessageIds.has(msgId)) return;
     if (msgId === '_pinned') return;
@@ -1983,26 +2092,71 @@ function initLiveSessionsAndChat() {
       ? `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${genderHtml} ${VERIFIED_TICK_SVG}`
       : `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${genderHtml}`;
 
+    let replyQuoteHtml = '';
+    if (data.replyTo && data.replyTo.name) {
+      replyQuoteHtml = `
+        <div class="chat-reply-quote" data-target-id="${escapeHtml(data.replyTo.id || '')}" title="Jump to original message">
+          <div class="chat-reply-quote-bar"></div>
+          <div class="chat-reply-quote-content">
+            <div class="chat-reply-quote-name">${escapeHtml(data.replyTo.name)}</div>
+            <div class="chat-reply-quote-text">${escapeHtml(data.replyTo.text || '')}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    const likesObj = (data.likes && typeof data.likes === 'object') ? data.likes : {};
+    const likeCount = Object.keys(likesObj).length;
+    const hasLiked = Boolean(likesObj[mySessionId]) || localLikedMsgIds.has(msgId);
+
+    let tapbackHtml = '';
+    if (likeCount > 0) {
+      tapbackHtml = `
+        <div class="chat-tapback-badge ${hasLiked ? 'is-liked' : ''}" data-id="${escapeHtml(msgId)}" title="${likeCount} Like${likeCount > 1 ? 's' : ''}">
+          <span class="tapback-emoji">❤️</span><span class="tapback-count">${likeCount}</span>
+        </div>
+      `;
+    }
+
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''}`;
     msgEl.dataset.id = msgId;
 
     msgEl.innerHTML = `
-      <div class="chat-msg-header">
-        <span class="chat-msg-sender" style="color: ${tagColor};">${senderHtml}</span>
-        <div class="chat-msg-header-right">
-          <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
-          <div class="chat-admin-actions">
-            <button type="button" class="chat-admin-action-btn chat-pin-btn" data-id="${escapeHtml(msgId)}" title="Pin message" aria-label="Pin message">
-              <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/></svg>
-            </button>
-            <button type="button" class="chat-admin-action-btn chat-delete-btn" data-id="${escapeHtml(msgId)}" title="Delete message" aria-label="Delete message">
-              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-6 5v6m4-6v6"/></svg>
-            </button>
+      <div class="chat-msg-bubble">
+        ${replyQuoteHtml}
+        <div class="chat-msg-header">
+          <span class="chat-msg-sender" style="color: ${tagColor};">${senderHtml}</span>
+          <div class="chat-msg-header-right">
+            <span class="chat-msg-time">${escapeHtml(timeStr)}</span>
           </div>
         </div>
+        <div class="chat-msg-text">${escapeHtml(text)}</div>
+        ${tapbackHtml}
       </div>
-      <div class="chat-msg-text">${escapeHtml(text)}</div>
+      <div class="chat-msg-actions">
+        <button type="button" class="chat-action-btn chat-like-btn ${hasLiked ? 'has-liked' : ''}" data-id="${escapeHtml(msgId)}" title="Like message" aria-label="Like message">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="${hasLiked ? '#f43f5e' : 'none'}" stroke="${hasLiked ? '#f43f5e' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <span class="chat-like-count">${likeCount > 0 ? likeCount : ''}</span>
+        </button>
+        <button type="button" class="chat-action-btn chat-reply-btn" data-id="${escapeHtml(msgId)}" title="Reply to message" aria-label="Reply to message">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="9 17 4 12 9 7"></polyline>
+            <path d="M20 18v-2a4 4 0 0 0-4-4H4"></path>
+          </svg>
+          Reply
+        </button>
+        <div class="chat-admin-actions">
+          <button type="button" class="chat-admin-action-btn chat-pin-btn" data-id="${escapeHtml(msgId)}" title="Pin message" aria-label="Pin message">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/></svg>
+          </button>
+          <button type="button" class="chat-admin-action-btn chat-delete-btn" data-id="${escapeHtml(msgId)}" title="Delete message" aria-label="Delete message">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-6 5v6m4-6v6"/></svg>
+          </button>
+        </div>
+      </div>
     `;
 
     const isScrolledToBottom =
@@ -2018,6 +2172,10 @@ function initLiveSessionsAndChat() {
         const oldMsg = allMsgs[i];
         if (oldMsg && oldMsg.dataset.id) {
           seenMessageIds.delete(oldMsg.dataset.id);
+          if (likeListenerUnsubs.has(oldMsg.dataset.id)) {
+            try { likeListenerUnsubs.get(oldMsg.dataset.id)(); } catch (e) {}
+            likeListenerUnsubs.delete(oldMsg.dataset.id);
+          }
         }
         oldMsg.remove();
       }
@@ -2029,7 +2187,7 @@ function initLiveSessionsAndChat() {
 
     // Trigger 2-second popping message on top of the song slider for live messages!
     if (isLive) {
-      triggerSongPoppingMessage(senderName, text, tagColor, isVerified, gender);
+      triggerSongPoppingMessage(senderName, text, tagColor, isVerified, gender, data.replyTo);
     }
 
     // Trigger glowing green dot for unread messages if chat drawer is currently closed
@@ -2042,6 +2200,52 @@ function initLiveSessionsAndChat() {
 
   if (chatMessagesContainer) {
     chatMessagesContainer.addEventListener('click', (e) => {
+      // 1. Like button or Tapback badge click
+      const likeTrigger = e.target.closest('.chat-like-btn, .chat-tapback-badge');
+      if (likeTrigger) {
+        const msgId = likeTrigger.getAttribute('data-id');
+        if (msgId) {
+          likeTrigger.style.transform = 'scale(1.22)';
+          setTimeout(() => { likeTrigger.style.transform = ''; }, 160);
+          if (typeof toggleLikeChatMessageFn === 'function') {
+            toggleLikeChatMessageFn(msgId);
+          }
+        }
+        return;
+      }
+
+      // 2. Reply button click
+      const replyBtn = e.target.closest('.chat-reply-btn');
+      if (replyBtn) {
+        const msgId = replyBtn.getAttribute('data-id');
+        const msgEl = replyBtn.closest('.chat-msg');
+        if (msgEl) {
+          const senderName = msgEl.querySelector('.chat-sender-name')?.textContent || 'Passenger';
+          const text = msgEl.querySelector('.chat-msg-text')?.textContent || '';
+          const senderColor = msgEl.querySelector('.chat-msg-sender')?.style.color || '#38bdf8';
+          setReplyingTo({ id: msgId, name: senderName, text, color: senderColor });
+        }
+        return;
+      }
+
+      // 3. Quoted reply click -> scroll to original message
+      const replyQuote = e.target.closest('.chat-reply-quote');
+      if (replyQuote) {
+        const targetId = replyQuote.getAttribute('data-target-id');
+        if (targetId && chatMessagesContainer) {
+          const targetMsg = chatMessagesContainer.querySelector(`.chat-msg[data-id="${targetId}"]`);
+          if (targetMsg) {
+            targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetMsg.classList.add('is-highlighted');
+            setTimeout(() => targetMsg.classList.remove('is-highlighted'), 1300);
+          } else {
+            notify('Original message is no longer in chat.');
+          }
+        }
+        return;
+      }
+
+      // 4. Admin delete
       const deleteBtn = e.target.closest('.chat-delete-btn');
       if (deleteBtn) {
         const msgId = deleteBtn.getAttribute('data-id');
@@ -2064,6 +2268,7 @@ function initLiveSessionsAndChat() {
         return;
       }
 
+      // 5. Admin pin
       const pinBtn = e.target.closest('.chat-pin-btn');
       if (pinBtn) {
         const msgId = pinBtn.getAttribute('data-id');
@@ -2205,6 +2410,16 @@ function initLiveSessionsAndChat() {
         const val = snapshot.val();
         if (val && typeof val === 'object') {
           appendChatMessage(snapshot.key, val, isInitialChatHistoryLoaded);
+
+          // Real-time listener for likes on this message
+          const msgLikesRef = ref(db, `messages/${snapshot.key}/likes`);
+          const unsub = onValue(msgLikesRef, (likeSnap) => {
+            const lVal = likeSnap.val() || {};
+            const count = (typeof lVal === 'object' && lVal !== null) ? Object.keys(lVal).length : 0;
+            const hasLiked = Boolean(lVal && lVal[mySessionId]);
+            updateMessageLikeUI(snapshot.key, count, hasLiked);
+          });
+          likeListenerUnsubs.set(snapshot.key, unsub);
         }
       });
 
@@ -2212,6 +2427,10 @@ function initLiveSessionsAndChat() {
         if (snapshot.key === '_pinned') {
           renderPinnedCard(null);
           return;
+        }
+        if (likeListenerUnsubs.has(snapshot.key)) {
+          try { likeListenerUnsubs.get(snapshot.key)(); } catch (e) {}
+          likeListenerUnsubs.delete(snapshot.key);
         }
         if (!chatMessagesContainer) return;
         const msgEl = chatMessagesContainer.querySelector(`.chat-msg[data-id="${snapshot.key}"]`);
@@ -2242,6 +2461,19 @@ function initLiveSessionsAndChat() {
         autoPruneOldMessages();
       }, 1200);
 
+      toggleLikeChatMessageFn = (msgId) => {
+        const myLikeRef = ref(db, `messages/${msgId}/likes/${mySessionId}`);
+        return get(myLikeRef).then((snap) => {
+          if (snap.exists() && snap.val() === true) {
+            return remove(myLikeRef);
+          } else {
+            return set(myLikeRef, true);
+          }
+        }).catch((err) => {
+          console.warn('Like toggle error:', err);
+        });
+      };
+
       deleteChatMessageFn = (msgId) => {
         const p = remove(ref(db, `messages/${msgId}`));
         if (currentPinnedMessage && currentPinnedMessage.id === msgId) {
@@ -2266,7 +2498,7 @@ function initLiveSessionsAndChat() {
         return remove(ref(db, 'messages/_pinned'));
       };
 
-      sendChatMessageFn = (name, text, isSenderAdmin = false, gender = 'M') => {
+      sendChatMessageFn = (name, text, isSenderAdmin = false, gender = 'M', replyTo = null) => {
         const payload = {
           name,
           text,
@@ -2274,6 +2506,13 @@ function initLiveSessionsAndChat() {
           session: mySessionId,
           timestamp: serverTimestamp()
         };
+        if (replyTo && replyTo.name) {
+          payload.replyTo = {
+            id: replyTo.id || '',
+            name: replyTo.name.slice(0, 24),
+            text: (replyTo.text || '').slice(0, 80)
+          };
+        }
         if (isSenderAdmin && isAdminVerified) {
           payload.name = 'Admin';
           payload.isAdmin = true;

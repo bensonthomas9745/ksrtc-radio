@@ -439,19 +439,31 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             </div>
           </div>
 
+          <!-- Apple-Style Reply Preview Bar -->
+          <div class="chat-reply-bar" id="chat-reply-bar" hidden aria-label="Replying to message">
+            <div class="chat-reply-bar-accent" id="chat-reply-bar-accent"></div>
+            <div class="chat-reply-bar-content">
+              <span class="chat-reply-bar-title" id="chat-reply-bar-title">Replying to Passenger</span>
+              <span class="chat-reply-bar-snippet" id="chat-reply-bar-snippet"></span>
+            </div>
+            <button type="button" class="chat-reply-cancel-btn" id="chat-reply-cancel-btn" aria-label="Cancel reply" title="Cancel reply">✕</button>
+          </div>
+
           <form class="chat-input-form" id="chat-form" autocomplete="off">
-            <input type="text" id="chat-message-input" class="chat-message-input" placeholder="Say something…" maxlength="140" autocomplete="off" required />
-            <button type="submit" class="chat-send-btn" id="chat-send-btn" aria-label="Send message">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-            </button>
+            <div class="chat-input-pill">
+              <input type="text" id="chat-message-input" class="chat-message-input" placeholder="Say something aboard KSRTC…" maxlength="140" autocomplete="off" required />
+              <button type="submit" class="chat-send-btn" id="chat-send-btn" aria-label="Send message" disabled>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="19" x2="12" y2="5"></line>
+                  <polyline points="5 12 12 5 19 12"></polyline>
+                </svg>
+              </button>
+            </div>
           </form>
         </aside>
       </div>
     </main>
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=39"></script>
+    <script type="module" src="./src/app.js?v=40"></script>
   </body>
 </html>
