@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=61" />
+    <link rel="stylesheet" href="./src/styles.css?v=62" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -426,6 +426,15 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           </div>
 
           <div class="whats-new-actions">
+            <label class="whats-new-dont-show-wrap" for="whats-new-dont-show">
+              <input type="checkbox" id="whats-new-dont-show" class="whats-new-dont-show-checkbox" />
+              <span class="whats-new-dont-show-box" aria-hidden="true">
+                <svg viewBox="0 0 12 10" width="10" height="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1.5 5 4.5 8 10.5 1.5"></polyline>
+                </svg>
+              </span>
+              <span class="whats-new-dont-show-text">Don't show this again</span>
+            </label>
             <button type="button" class="whats-new-action-btn" id="whats-new-action-btn">Got it</button>
           </div>
         </div>
@@ -757,6 +766,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=73"></script>
+    <script type="module" src="./src/app.js?v=74"></script>
   </body>
 </html>

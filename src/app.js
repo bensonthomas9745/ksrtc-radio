@@ -1,15 +1,74 @@
 import { journeyConfig, playlist } from './config.js?v=5';
 
+// High-entropy cryptographic random number generator between [0, 1)
+function secureRandom() {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] / (0xffffffff + 1);
+  }
+  return Math.random();
+}
+
+// Multi-pass Fisher-Yates shuffle with cryptographic entropy
 function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
+  if (!Array.isArray(array) || array.length <= 1) return array;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(secureRandom() * (i + 1));
+      const temp = array[i];
+      array[i] = array[j];
+      array[j] = temp;
+    }
   }
   return array;
 }
 
+// Pre-load locally cached global/community songs before initial shuffle
+// so community songs are mixed uniformly across the entire playlist
+const SHARED_SONGS_STORAGE_KEY = 'ksrtc_community_songs_v1';
+function getStoredCommunitySongs() {
+  try {
+    const raw = localStorage.getItem(SHARED_SONGS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+try {
+  const cachedSongs = getStoredCommunitySongs();
+  if (Array.isArray(cachedSongs)) {
+    cachedSongs.forEach(s => {
+      if (s && s.id && !playlist.some(p => p.id === s.id)) {
+        playlist.push({
+          id: s.id,
+          title: s.title,
+          artist: s.artist || 'Community Added',
+          albumArt: s.albumArt || `https://img.youtube.com/vi/${s.id}/hqdefault.jpg`,
+          isCommunityAdded: true
+        });
+      }
+    });
+  }
+} catch (_) {}
+
 // Always shuffle playlist whenever refreshed or loaded
 shuffle(playlist);
+
+// Ensure starting song is always different from the previous session / refresh
+const PREV_START_SONG_KEY = 'ksrtc_prev_start_song_id';
+try {
+  const prevStartId = sessionStorage.getItem(PREV_START_SONG_KEY) || localStorage.getItem(PREV_START_SONG_KEY);
+  if (playlist.length > 1 && playlist[0].id === prevStartId) {
+    const swapIdx = 1 + Math.floor(secureRandom() * (playlist.length - 1));
+    [playlist[0], playlist[swapIdx]] = [playlist[swapIdx], playlist[0]];
+  }
+  if (playlist[0] && playlist[0].id) {
+    sessionStorage.setItem(PREV_START_SONG_KEY, playlist[0].id);
+    localStorage.setItem(PREV_START_SONG_KEY, playlist[0].id);
+  }
+} catch (_) {}
 
 const $ = (id) => document.getElementById(id);
 const state = { isJourneyStarted:false, isRainMode:false, isStopping:false, currentVideo:'journey', currentSongIndex:0, isPlaying:false, currentTime:0, duration:0, startTimer:null, unblurTimer:null };
@@ -55,10 +114,34 @@ const whatsNewCloseBtn = $('whats-new-close-btn');
 const whatsNewActionBtn = $('whats-new-action-btn');
 const whatsNewBackdrop = $('whats-new-backdrop');
 const whatsNewOpenBtn = $('whats-new-open-btn');
+const whatsNewDontShow = $('whats-new-dont-show');
+
+const WHATS_NEW_DISMISSED_KEY = 'ksrtc_whats_new_dismissed_v1';
+
+function isWhatsNewDismissed() {
+  try {
+    return localStorage.getItem(WHATS_NEW_DISMISSED_KEY) === 'true';
+  } catch (_) {
+    return false;
+  }
+}
+
+function setWhatsNewDismissed(dismissed) {
+  try {
+    if (dismissed) {
+      localStorage.setItem(WHATS_NEW_DISMISSED_KEY, 'true');
+    } else {
+      localStorage.removeItem(WHATS_NEW_DISMISSED_KEY);
+    }
+  } catch (_) {}
+}
 
 function showWhatsNewModal() {
   const modal = $('whats-new-modal');
   if (!modal) return;
+  if (whatsNewDontShow) {
+    whatsNewDontShow.checked = isWhatsNewDismissed();
+  }
   modal.hidden = false;
   modal.classList.remove('is-closing');
 }
@@ -66,6 +149,9 @@ function showWhatsNewModal() {
 function hideWhatsNewModal() {
   const modal = $('whats-new-modal');
   if (!modal) return;
+  if (whatsNewDontShow) {
+    setWhatsNewDismissed(whatsNewDontShow.checked);
+  }
   modal.classList.add('is-closing');
   setTimeout(() => {
     modal.hidden = true;
@@ -85,6 +171,11 @@ if (whatsNewBackdrop) {
 if (whatsNewOpenBtn) {
   whatsNewOpenBtn.addEventListener('click', () => {
     showWhatsNewModal();
+  });
+}
+if (whatsNewDontShow) {
+  whatsNewDontShow.addEventListener('change', (e) => {
+    setWhatsNewDismissed(Boolean(e.target.checked));
   });
 }
 document.addEventListener('keydown', (e) => {
@@ -573,7 +664,21 @@ function toggleRainSound() {
 }
 
 function setTrack(index, shouldPlay = true) {
-  state.currentSongIndex = (index + playlist.length) % playlist.length;
+  if (playlist.length > 1 && index >= playlist.length) {
+    const lastTrack = playlist[state.currentSongIndex];
+    shuffle(playlist);
+    if (lastTrack && playlist[0].id === lastTrack.id && playlist.length > 1) {
+      const swapIdx = 1 + Math.floor(secureRandom() * (playlist.length - 1));
+      [playlist[0], playlist[swapIdx]] = [playlist[swapIdx], playlist[0]];
+    }
+    state.currentSongIndex = 0;
+    if (typeof renderPlaylist === 'function') {
+      const activeFilter = (typeof currentSearchFilter !== 'undefined') ? currentSearchFilter : '';
+      if (!activeFilter) renderPlaylist('');
+    }
+  } else {
+    state.currentSongIndex = (index + playlist.length) % playlist.length;
+  }
   const track = playlist[state.currentSongIndex];
   els.title.textContent = track.title;
   els.artist.textContent = track.artist;
@@ -912,10 +1017,12 @@ const finishLoading = () => {
     }, 600);
   }
 
-  // Open Apple-style "What's New" dialog when loading finishes
-  setTimeout(() => {
-    showWhatsNewModal();
-  }, 750);
+  // Open Apple-style "What's New" dialog when loading finishes if not dismissed by user
+  if (!isWhatsNewDismissed()) {
+    setTimeout(() => {
+      showWhatsNewModal();
+    }, 750);
+  }
 
   // Preload secondary scenes smoothly in background now that ride is active
   preloadSecondaryVideos();
@@ -1508,16 +1615,6 @@ try {
 } catch (e) {}
 
 let addSongToGlobalPlaylistFn = null;
-const SHARED_SONGS_STORAGE_KEY = 'ksrtc_community_songs_v1';
-
-function getStoredCommunitySongs() {
-  try {
-    const raw = localStorage.getItem(SHARED_SONGS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (_) {
-    return [];
-  }
-}
 
 function saveStoredCommunitySong(song) {
   try {
@@ -1539,13 +1636,20 @@ function integrateGlobalSong(songData) {
   if (!songData || !songData.id) return;
   const existing = playlist.find(s => s.id === songData.id);
   if (!existing) {
-    playlist.push({
+    const newSong = {
       id: songData.id,
       title: songData.title,
       artist: songData.artist || 'Community Added',
       albumArt: songData.albumArt || `https://img.youtube.com/vi/${songData.id}/hqdefault.jpg`,
       isCommunityAdded: true
-    });
+    };
+    if (playlist.length > state.currentSongIndex + 1) {
+      const remainingCount = playlist.length - (state.currentSongIndex + 1);
+      const insertOffset = Math.floor(secureRandom() * (remainingCount + 1));
+      playlist.splice(state.currentSongIndex + 1 + insertOffset, 0, newSong);
+    } else {
+      playlist.push(newSong);
+    }
     saveStoredCommunitySong(songData);
     if (playlistCountBadge) playlistCountBadge.textContent = String(playlist.length);
     if (playlistSubtitle) playlistSubtitle.textContent = `${playlist.length} songs`;
@@ -1561,7 +1665,7 @@ function integrateGlobalSong(songData) {
   }
 }
 
-// Pre-load locally cached global/community songs
+// Ensure all cached community songs are marked in the active playlist
 getStoredCommunitySongs().forEach(s => integrateGlobalSong(s));
 
 function addSongToGlobalPlaylist(song) {
