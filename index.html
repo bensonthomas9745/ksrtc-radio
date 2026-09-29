@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=60" />
+    <link rel="stylesheet" href="./src/styles.css?v=61" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -99,13 +99,38 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         </span>
         <div class="brand-text">
           <span class="brand-name">KSRTC RADIO</span>
-          <div class="live-indicator-badge" id="live-indicator" aria-label="Live listeners" title="Currently open sessions">
-            <span class="live-dot-wrap">
-              <span class="live-dot-ping" aria-hidden="true"></span>
-              <span class="live-dot" aria-hidden="true"></span>
-            </span>
-            <span class="live-count" id="live-count">1</span>
-            <span class="live-label">live</span>
+          <div class="brand-sub-row">
+            <div class="live-indicator-badge" id="live-indicator" aria-label="Live listeners" title="Currently open sessions">
+              <span class="live-dot-wrap">
+                <span class="live-dot-ping" aria-hidden="true"></span>
+                <span class="live-dot" aria-hidden="true"></span>
+              </span>
+              <span class="live-count" id="live-count">1</span>
+              <span class="live-label">live</span>
+            </div>
+
+            <div class="song-volume-wrap" id="song-volume-wrap">
+              <button type="button" class="song-volume-btn" id="song-volume-btn" aria-label="Song volume" title="Adjust song volume" aria-expanded="false">
+                <svg class="song-vol-icon song-vol-icon-high" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+                <svg class="song-vol-icon song-vol-icon-med" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+                <svg class="song-vol-icon song-vol-icon-mute" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <line x1="23" y1="9" x2="17" y2="15"></line>
+                  <line x1="17" y1="9" x2="23" y2="15"></line>
+                </svg>
+              </button>
+
+              <div class="song-volume-popover" id="song-volume-popover" hidden role="region" aria-label="Song volume slider">
+                <input type="range" class="song-volume-slider" id="song-volume-slider" min="0" max="100" value="82" aria-label="Song volume" />
+                <span class="song-volume-val" id="song-volume-val">82%</span>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -732,6 +757,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=72"></script>
+    <script type="module" src="./src/app.js?v=73"></script>
   </body>
 </html>

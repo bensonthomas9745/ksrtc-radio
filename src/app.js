@@ -160,6 +160,63 @@ els.title.textContent = playlist[0].title;
 els.artist.textContent = playlist[0].artist;
 els.album.src = playlist[0].albumArt;
 
+// Song / Music state & user volume preference (default: 82%)
+const SONG_VOLUME_STORAGE_KEY = 'ksrtc_song_volume';
+const savedSongVolume = (() => {
+  try { return localStorage.getItem(SONG_VOLUME_STORAGE_KEY); } catch (e) { return null; }
+})();
+let currentSongVolume = savedSongVolume !== null ? Math.max(0, Math.min(100, parseInt(savedSongVolume, 10))) : Math.round((journeyConfig.volumes.music ?? 0.82) * 100);
+let lastNonZeroSongVolume = currentSongVolume > 0 ? currentSongVolume : 82;
+journeyConfig.volumes.music = currentSongVolume / 100;
+
+const songVolumeWrap = $('song-volume-wrap');
+const songVolumeBtn = $('song-volume-btn');
+const songVolumePopover = $('song-volume-popover');
+const songVolumeSlider = $('song-volume-slider');
+const songVolumeVal = $('song-volume-val');
+
+function updateSongVolumeUI() {
+  if (songVolumeSlider) {
+    songVolumeSlider.value = currentSongVolume;
+    songVolumeSlider.style.setProperty('--progress', `${currentSongVolume}%`);
+  }
+  if (songVolumeVal) {
+    songVolumeVal.textContent = `${currentSongVolume}%`;
+  }
+  if (songVolumeBtn) {
+    const state = currentSongVolume === 0 ? 'mute' : (currentSongVolume <= 50 ? 'med' : 'high');
+    songVolumeBtn.setAttribute('data-state', state);
+    songVolumeBtn.setAttribute('title', `Song Volume: ${currentSongVolume}%`);
+    songVolumeBtn.setAttribute('aria-label', `Song Volume: ${currentSongVolume}%`);
+  }
+}
+
+function setSongVolume(vol, persist = true) {
+  const clamped = Math.max(0, Math.min(100, Math.round(Number(vol) || 0)));
+  currentSongVolume = clamped;
+  journeyConfig.volumes.music = clamped / 100;
+  if (clamped > 0) lastNonZeroSongVolume = clamped;
+
+  if (persist) {
+    try { localStorage.setItem(SONG_VOLUME_STORAGE_KEY, String(clamped)); } catch (e) {}
+  }
+
+  try {
+    if (ytPlayer && ytReady) {
+      if (clamped === 0) {
+        if (ytPlayer.mute) ytPlayer.mute();
+      } else {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(clamped);
+      }
+    }
+  } catch (e) {}
+
+  updateSongVolumeUI();
+}
+
+updateSongVolumeUI();
+
 // Rain sound state & user volume preference (default: 80%)
 const savedRainVolume = (() => {
   try { return localStorage.getItem('ksrtc_rain_sound_volume_v2'); } catch (e) { return null; }
@@ -362,10 +419,15 @@ function initYTPlayer() {
         onReady: () => {
           ytReady = true;
           try {
-            if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+            if (currentSongVolume === 0) {
+              if (ytPlayer.mute) ytPlayer.mute();
+            } else {
+              if (ytPlayer.unMute) ytPlayer.unMute();
+              if (ytPlayer.setVolume) ytPlayer.setVolume(currentSongVolume);
+            }
             // Only play if the journey has actually started and finished the loading screen!
             if (hasFinished && state.isPlaying) {
-              if (ytPlayer.unMute) ytPlayer.unMute();
+              if (currentSongVolume > 0 && ytPlayer.unMute) ytPlayer.unMute();
               if (ytPlayer.playVideo) ytPlayer.playVideo();
             }
           } catch (e) {
@@ -527,8 +589,12 @@ function setTrack(index, shouldPlay = true) {
     return;
   }
   try {
-    if (ytPlayer.unMute) ytPlayer.unMute();
-    if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+    if (currentSongVolume === 0) {
+      if (ytPlayer.mute) ytPlayer.mute();
+    } else {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(currentSongVolume);
+    }
     if (shouldPlay) {
       userExplicitlyPaused = false;
       state.isPlaying = true;
@@ -562,8 +628,12 @@ function playMusic() {
   updatePlaylistActiveState();
   if (ytPlayer && ytReady) {
     try {
-      if (ytPlayer.unMute) ytPlayer.unMute();
-      if (ytPlayer.setVolume) ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+      if (currentSongVolume === 0) {
+        if (ytPlayer.mute) ytPlayer.mute();
+      } else {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(currentSongVolume);
+      }
       if (ytPlayer.playVideo) {
         ytPlayer.playVideo();
       } else {
@@ -1064,6 +1134,65 @@ if (els.rainSoundToggle) {
   els.rainSoundToggle.addEventListener('click', toggleRainSound);
 }
 
+// Song Volume Listeners
+if (songVolumeBtn) {
+  songVolumeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!songVolumePopover) return;
+    const isHidden = songVolumePopover.hidden;
+    if (isHidden) {
+      songVolumePopover.hidden = false;
+      songVolumeBtn.setAttribute('aria-expanded', 'true');
+    } else {
+      // Toggle mute if clicked while popover is open
+      setSongVolume(currentSongVolume > 0 ? 0 : lastNonZeroSongVolume, true);
+    }
+  });
+
+  songVolumeBtn.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 5 : -5;
+    setSongVolume(currentSongVolume + delta, true);
+  }, { passive: false });
+}
+
+if (songVolumeSlider) {
+  songVolumeSlider.addEventListener('input', (e) => {
+    setSongVolume(e.target.value, false);
+  });
+  songVolumeSlider.addEventListener('change', (e) => {
+    setSongVolume(e.target.value, true);
+  });
+}
+
+if (songVolumePopover) {
+  songVolumePopover.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+  songVolumePopover.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 5 : -5;
+    setSongVolume(currentSongVolume + delta, true);
+  }, { passive: false });
+}
+
+// Close volume popover when clicking outside or pressing Escape
+document.addEventListener('click', (e) => {
+  if (songVolumePopover && !songVolumePopover.hidden) {
+    if (!songVolumePopover.contains(e.target) && (!songVolumeBtn || !songVolumeBtn.contains(e.target))) {
+      songVolumePopover.hidden = true;
+      if (songVolumeBtn) songVolumeBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && songVolumePopover && !songVolumePopover.hidden) {
+    songVolumePopover.hidden = true;
+    if (songVolumeBtn) songVolumeBtn.setAttribute('aria-expanded', 'false');
+  }
+});
+
 function onStopEnded() {
   clearTimeout(stopFallbackTimer);
   if (state.isStopping) {
@@ -1130,11 +1259,11 @@ const unlockAudioOnFirstTouch = (e) => {
 
   if (ytPlayer && ytReady) {
     try {
-      if (ytPlayer.isMuted && ytPlayer.isMuted()) {
+      if (currentSongVolume > 0 && ytPlayer.isMuted && ytPlayer.isMuted()) {
         ytPlayer.unMute();
       }
-      if (ytPlayer.getVolume && ytPlayer.getVolume() === 0) {
-        ytPlayer.setVolume(Math.round(journeyConfig.volumes.music * 100));
+      if (ytPlayer.getVolume && ytPlayer.getVolume() === 0 && currentSongVolume > 0) {
+        ytPlayer.setVolume(currentSongVolume);
       }
     } catch (e) {}
   }
