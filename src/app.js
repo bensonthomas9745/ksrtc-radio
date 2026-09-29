@@ -2573,7 +2573,10 @@ function openChatDrawer() {
   chatDrawerWrap.hidden = false;
   void chatDrawerWrap.offsetWidth;
   chatDrawerWrap.classList.add('is-open');
-  if (chatToggle) chatToggle.setAttribute('aria-expanded', 'true');
+  if (chatToggle) {
+    chatToggle.setAttribute('aria-expanded', 'true');
+    chatToggle.classList.remove('is-breathing');
+  }
 
   // Dismiss any floating popups or desktop overlays when chat drawer is opened
   if (desktopRecentChatsContainer) {
@@ -2586,11 +2589,6 @@ function openChatDrawer() {
     clearTimeout(popBubbleFadeTimer);
     chatPopBubble.hidden = true;
     chatPopBubble.classList.remove('is-popping', 'is-leaving', 'is-admin-pop');
-  }
-
-  // Keep glowing green dot visible full-time as requested
-  if (chatUnreadDot) {
-    chatUnreadDot.hidden = false;
   }
 
   const mainLive = $('live-count');
@@ -3312,19 +3310,19 @@ function initLiveSessionsAndChat() {
       playSoundEffect(messageAudio);
     }
 
-    // Live message incoming: trigger popping message (on mobile)
+    // Live message incoming: trigger popping message (on mobile) & breathing glow on chat button
     if (isLive) {
       const popSnippet = text || (hasImage ? '📷 Shared a photo' : (hasGif ? '🎞️ Shared a GIF' : ''));
       triggerSongPoppingMessage(displayName, popSnippet, tagColor, isVerified, gender, data.replyTo);
+
+      // Make whole chat option glow with breathing animation when new chat arrives while drawer is closed
+      if (chatToggle && (!chatDrawerWrap || chatDrawerWrap.hidden || !chatDrawerWrap.classList.contains('is-open'))) {
+        chatToggle.classList.add('is-breathing');
+      }
     }
 
     // Always update the desktop recent 5 chats overlay (shows for 5s on live messages)
     updateDesktopRecentChats(msgId, data, isLive);
-
-    // Keep glowing green dot visible full-time as requested
-    if (chatUnreadDot) {
-      chatUnreadDot.hidden = false;
-    }
   }
 
   if (chatMessagesContainer) {

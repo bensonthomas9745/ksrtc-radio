@@ -1277,12 +1277,6 @@ button { color:inherit; cursor:pointer; }
     gap: 6px;
     font-size: 12px;
   }
-  .chat-toggle .chat-unread-dot {
-    top: 5.5px;
-    right: 8px;
-    width: 7px;
-    height: 7px;
-  }
 }
 @media (max-width: 640px) {
   .playlist-drawer-wrap {
@@ -1372,34 +1366,101 @@ button { color:inherit; cursor:pointer; }
   .playlist-toggle {
     padding: 6px 9px;
   }
-  .chat-toggle .chat-unread-dot {
-    top: 4.5px;
-    right: 5.5px;
-    width: 6.5px;
-    height: 6.5px;
-  }
 }
 
 /* ==========================================================================
-   Passenger Live Chat Styles (Apple / Kerala Scenic Theme)
+   Passenger Live Chat Toggle (Green Glow Aura & Breathing Effect)
    ========================================================================== */
+.chat-unread-dot {
+  display: none !important;
+}
+
 .chat-toggle {
   position: relative;
-}
-.chat-unread-dot {
-  position: absolute;
-  top: 7px;
-  right: 10px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #86efac 0%, #10b981 55%, #059669 100%);
+  border-color: rgba(34, 197, 94, 0.45) !important;
   box-shadow: 
-    0 0 0 1.5px rgba(20, 22, 18, 0.95),
-    0 0 7px rgba(16, 185, 129, 0.95),
-    0 0 14px rgba(16, 185, 129, 0.6);
-  pointer-events: none;
-  z-index: 3;
+    0 0 10px rgba(34, 197, 94, 0.28),
+    0 4px 18px rgba(0, 0, 0, 0.4),
+    inset 0 0 6px rgba(34, 197, 94, 0.16),
+    inset 0 1px 1px rgba(255, 255, 255, 0.14) !important;
+  transition: transform .2s cubic-bezier(.2,.8,.2,1), background .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease !important;
+}
+
+.chat-toggle:hover {
+  background: rgba(26, 38, 28, 0.88) !important;
+  border-color: rgba(74, 222, 128, 0.72) !important;
+  box-shadow: 
+    0 0 18px rgba(34, 197, 94, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.55),
+    inset 0 0 8px rgba(34, 197, 94, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.22) !important;
+  transform: translateY(-1px);
+}
+
+.chat-toggle:active {
+  transform: scale(0.96);
+}
+
+.chat-toggle .chat-toggle-icon {
+  color: #86efac;
+  filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.45));
+  transition: transform .2s ease, color .2s ease, filter .2s ease;
+}
+
+.chat-toggle:hover .chat-toggle-icon {
+  color: #bbf7d0;
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 7px rgba(34, 197, 94, 0.8));
+}
+
+/* Breathing Glow effect when new chat arrives */
+@keyframes chatGlowBreathing {
+  0% {
+    border-color: rgba(34, 197, 94, 0.42);
+    box-shadow: 
+      0 0 8px rgba(34, 197, 94, 0.3),
+      0 4px 18px rgba(0, 0, 0, 0.4),
+      inset 0 0 5px rgba(34, 197, 94, 0.14);
+    transform: scale(1);
+  }
+  50% {
+    border-color: rgba(74, 222, 128, 0.95);
+    box-shadow: 
+      0 0 22px rgba(34, 197, 94, 0.9),
+      0 0 38px rgba(34, 197, 94, 0.48),
+      0 6px 24px rgba(0, 0, 0, 0.55),
+      inset 0 0 10px rgba(34, 197, 94, 0.35);
+    transform: scale(1.036);
+  }
+  100% {
+    border-color: rgba(34, 197, 94, 0.42);
+    box-shadow: 
+      0 0 8px rgba(34, 197, 94, 0.3),
+      0 4px 18px rgba(0, 0, 0, 0.4),
+      inset 0 0 5px rgba(34, 197, 94, 0.14);
+    transform: scale(1);
+  }
+}
+
+@keyframes chatIconPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+.chat-toggle.is-breathing {
+  animation: chatGlowBreathing 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+}
+
+.chat-toggle.is-breathing .chat-toggle-icon {
+  color: #4ade80;
+  filter: drop-shadow(0 0 9px rgba(34, 197, 94, 0.95));
+  animation: chatIconPulse 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 /* Chat Drawer Container */
