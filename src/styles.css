@@ -3295,6 +3295,298 @@ button { color:inherit; cursor:pointer; }
   }
 }
 
+/* ==========================================================================
+   Apple-Style "What's New" Dialog Box
+   Minimal, professional, frosted-glass sheet popping up on loading finish
+   ========================================================================== */
+.whats-new-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  animation: appleFadeIn 0.22s ease-out both;
+  user-select: none;
+}
 
+.whats-new-modal[hidden] {
+  display: none !important;
+}
 
+.whats-new-modal.is-closing {
+  animation: appleFadeOut 0.18s ease-in forwards;
+}
 
+.whats-new-modal.is-closing .whats-new-card {
+  animation: appleScaleDown 0.18s ease-in forwards;
+}
+
+.whats-new-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.whats-new-card {
+  position: relative;
+  z-index: 2;
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(86vh, 670px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(26, 28, 34, 0.85);
+  backdrop-filter: blur(40px) saturate(190%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%);
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 22px;
+  padding: 22px 20px 18px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.3);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'DM Sans', sans-serif;
+  animation: appleScaleUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  box-sizing: border-box;
+}
+
+.whats-new-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  color: rgba(235, 235, 245, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 3;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.whats-new-close-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+.whats-new-close-btn:active {
+  transform: scale(0.92);
+}
+
+.whats-new-header {
+  padding-right: 30px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.whats-new-title {
+  margin: 0;
+  font-size: 17.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #ffffff;
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.whats-new-title strong {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.whats-new-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(235, 235, 245, 0.68);
+  font-weight: 400;
+}
+
+.whats-new-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+.whats-new-body::-webkit-scrollbar {
+  width: 4px;
+}
+.whats-new-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.whats-new-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.whats-new-section {
+  background: rgba(255, 255, 255, 0.04);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 13px;
+  padding: 10px 12px;
+  transition: background 0.15s ease;
+}
+
+.whats-new-section:hover {
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.whats-new-sec-title {
+  margin: 0 0 6px;
+  font-size: 12.8px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.whats-new-sec-title strong {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.whats-new-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4.5px;
+}
+
+.whats-new-list li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 12.2px;
+  line-height: 1.45;
+  color: rgba(235, 235, 245, 0.82);
+  font-weight: 400;
+}
+
+.whats-new-list li::before {
+  content: '•';
+  position: absolute;
+  left: 3px;
+  color: rgba(235, 235, 245, 0.45);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.whats-new-list li strong {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.whats-new-footer-note {
+  background: linear-gradient(135deg, rgba(245, 200, 113, 0.09) 0%, rgba(255, 255, 255, 0.03) 100%);
+  border: 0.5px solid rgba(245, 200, 113, 0.22);
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.whats-new-footer-note p {
+  margin: 0;
+  font-size: 12.2px;
+  line-height: 1.45;
+  color: rgba(255, 248, 232, 0.88);
+}
+
+.whats-new-footer-note p + p {
+  margin-top: 3px;
+}
+
+.whats-new-footer-note strong {
+  color: #fce7b0;
+  font-weight: 600;
+}
+
+.whats-new-actions {
+  flex-shrink: 0;
+}
+
+.whats-new-action-btn {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  background: #0a84ff;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 14px rgba(10, 132, 255, 0.35);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.whats-new-action-btn:hover {
+  background: #0077ed;
+  box-shadow: 0 6px 18px rgba(10, 132, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+.whats-new-action-btn:active {
+  transform: scale(0.98);
+}
+
+button.drawer-whats-new-link {
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes appleFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes appleFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes appleScaleUp {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes appleScaleDown {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.94); }
+}
+
+@media (max-width: 480px) {
+  .whats-new-card {
+    width: 100%;
+    padding: 18px 15px 15px;
+    border-radius: 18px;
+    max-height: 88vh;
+  }
+  .whats-new-title {
+    font-size: 16px;
+  }
+}

@@ -49,6 +49,53 @@ function hideInstaModal() {
   modal.hidden = true;
 }
 
+// Apple-Style "What's New" Dialog Controller
+const whatsNewModal = $('whats-new-modal');
+const whatsNewCloseBtn = $('whats-new-close-btn');
+const whatsNewActionBtn = $('whats-new-action-btn');
+const whatsNewBackdrop = $('whats-new-backdrop');
+const whatsNewOpenBtn = $('whats-new-open-btn');
+
+function showWhatsNewModal() {
+  const modal = $('whats-new-modal');
+  if (!modal) return;
+  modal.hidden = false;
+  modal.classList.remove('is-closing');
+}
+
+function hideWhatsNewModal() {
+  const modal = $('whats-new-modal');
+  if (!modal) return;
+  modal.classList.add('is-closing');
+  setTimeout(() => {
+    modal.hidden = true;
+    modal.classList.remove('is-closing');
+  }, 180);
+}
+
+if (whatsNewCloseBtn) {
+  whatsNewCloseBtn.addEventListener('click', hideWhatsNewModal);
+}
+if (whatsNewActionBtn) {
+  whatsNewActionBtn.addEventListener('click', hideWhatsNewModal);
+}
+if (whatsNewBackdrop) {
+  whatsNewBackdrop.addEventListener('click', hideWhatsNewModal);
+}
+if (whatsNewOpenBtn) {
+  whatsNewOpenBtn.addEventListener('click', () => {
+    showWhatsNewModal();
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = $('whats-new-modal');
+    if (modal && !modal.hidden) {
+      hideWhatsNewModal();
+    }
+  }
+});
+
 // Initialize first track metadata in DOM
 els.title.textContent = playlist[0].title;
 els.artist.textContent = playlist[0].artist;
@@ -736,6 +783,11 @@ const finishLoading = () => {
     }, 600);
   }
 
+  // Open Apple-style "What's New" dialog when loading finishes
+  setTimeout(() => {
+    showWhatsNewModal();
+  }, 750);
+
   // Preload secondary scenes smoothly in background now that ride is active
   preloadSecondaryVideos();
 
@@ -762,6 +814,7 @@ const finishLoading = () => {
 
 function resetJourney() {
   hideInstaModal();
+  hideWhatsNewModal();
   clearTimeout(state.startTimer);
   clearTimeout(state.unblurTimer);
   clearTimeout(hornTimer);

@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=51" />
+    <link rel="stylesheet" href="./src/styles.css?v=52" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -333,6 +333,79 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         </div>
       </div>
 
+      <!-- Apple-Style "What's New" Dialog -->
+      <div id="whats-new-modal" class="whats-new-modal" hidden aria-modal="true" role="dialog" aria-labelledby="whats-new-title">
+        <div class="whats-new-backdrop" id="whats-new-backdrop"></div>
+        <div class="whats-new-card">
+          <button type="button" class="whats-new-close-btn" id="whats-new-close-btn" aria-label="Close dialog" title="Close">✕</button>
+          
+          <div class="whats-new-header">
+            <h2 id="whats-new-title" class="whats-new-title">🚌 <strong>KSRTC RADIO — WHAT’S NEW!</strong> 🎧</h2>
+            <p class="whats-new-subtitle">We’ve been working on improving your journey. Here are the latest updates:</p>
+          </div>
+
+          <div class="whats-new-body">
+            <!-- 1. Play Any Song -->
+            <div class="whats-new-section">
+              <h3 class="whats-new-sec-title">🎵 <strong>PLAY ANY SONG - Even from Youtube ad free.</strong></h3>
+              <ul class="whats-new-list">
+                <li>Search songs by title, movie or singer.</li>
+                <li>Paste any <strong>YouTube link</strong> and play it directly.</li>
+                <li><strong>Queue songs</strong> or add them to the <strong>Global List</strong> for everyone.</li>
+              </ul>
+            </div>
+
+            <!-- 2. Live Passenger Chat -->
+            <div class="whats-new-section">
+              <h3 class="whats-new-sec-title">💬 <strong>LIVE PASSENGER CHAT</strong></h3>
+              <ul class="whats-new-list">
+                <li>Chat with fellow passengers in real time.</li>
+                <li>Set your <strong>name + 👨/👩 tag</strong>.</li>
+                <li>See how many passengers are online.</li>
+              </ul>
+            </div>
+
+            <!-- 3. GIFs, Stickers & Photos -->
+            <div class="whats-new-section">
+              <h3 class="whats-new-sec-title">🎭 <strong>GIFs, STICKERS & PHOTOS</strong></h3>
+              <ul class="whats-new-list">
+                <li>Search and send <strong>GIPHY GIFs</strong>.</li>
+                <li>Share travel photos with captions.</li>
+                <li>Tap media to view it fullscreen.</li>
+              </ul>
+            </div>
+
+            <!-- 4. React & Reply -->
+            <div class="whats-new-section">
+              <h3 class="whats-new-sec-title">❤️ <strong>REACT & REPLY</strong></h3>
+              <ul class="whats-new-list">
+                <li>❤️ React to messages.</li>
+                <li>↩️ Reply to specific messages and start conversations.</li>
+              </ul>
+            </div>
+
+            <!-- 5. Better Multitasking -->
+            <div class="whats-new-section">
+              <h3 class="whats-new-sec-title">📱 <strong>BETTER MULTITASKING</strong></h3>
+              <ul class="whats-new-list">
+                <li>Mobile: See new messages through the <strong>floating chat bubble</strong>.</li>
+                <li>Desktop: Recent chats appear subtly over the scenic journey.</li>
+              </ul>
+            </div>
+
+            <!-- Footer note -->
+            <div class="whats-new-footer-note">
+              <p>🚍 <strong>More improvements are on the way.</strong></p>
+              <p>Thanks for riding with <strong>KSRTC Radio!</strong> ❤️</p>
+            </div>
+          </div>
+
+          <div class="whats-new-actions">
+            <button type="button" class="whats-new-action-btn" id="whats-new-action-btn">Got it</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Apple-Style Playlist Drawer / Sheet -->
       <div id="playlist-drawer-wrap" class="playlist-drawer-wrap" hidden aria-modal="true" role="dialog" aria-label="Playing List">
         <div class="playlist-backdrop" id="playlist-backdrop"></div>
@@ -344,6 +417,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               <h2 class="playlist-title">Playing List</h2>
               <span class="playlist-subtitle" id="playlist-subtitle">169 songs</span>
             </div>
+            <button type="button" class="drawer-about-link drawer-whats-new-link" id="whats-new-open-btn" title="What's New in KSRTC Radio">What’s New</button>
             <a href="/about" class="drawer-about-link" title="About KSRTC Radio">About</a>
             <button type="button" class="playlist-close-btn" id="playlist-close-btn" aria-label="Close playing list">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -600,6 +674,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=64"></script>
+    <script type="module" src="./src/app.js?v=65"></script>
   </body>
 </html>
