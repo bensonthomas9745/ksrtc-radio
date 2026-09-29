@@ -2101,7 +2101,6 @@ const chatForm = $('chat-form');
 const chatMessageInput = $('chat-message-input');
 const chatSendBtn = $('chat-send-btn');
 const chatUnreadDot = $('chat-unread-dot');
-const sliderChatDot = $('slider-chat-dot');
 const chatSystemNote = $('chat-system-note');
 const chatSystemNoteClose = $('chat-system-note-close');
 const chatPopBubble = $('chat-pop-bubble');
@@ -2578,8 +2577,8 @@ function openChatDrawer() {
     chatToggle.setAttribute('aria-expanded', 'true');
     chatToggle.classList.remove('is-breathing');
   }
-  if (sliderChatDot) {
-    sliderChatDot.hidden = true;
+  if (chatUnreadDot) {
+    chatUnreadDot.hidden = true;
   }
 
   // Dismiss any floating popups or desktop overlays when chat drawer is opened
@@ -2634,12 +2633,6 @@ function toggleChatDrawer() {
 
 if (chatToggle) {
   chatToggle.addEventListener('click', toggleChatDrawer);
-}
-if (sliderChatDot) {
-  sliderChatDot.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openChatDrawer();
-  });
 }
 if (chatCloseBtn) {
   chatCloseBtn.addEventListener('click', closeChatDrawer);
@@ -3330,9 +3323,9 @@ function initLiveSessionsAndChat() {
         chatToggle.classList.add('is-breathing');
       }
 
-      // Show green dot in bottom right in the line when new messages come
-      if (sliderChatDot && (!chatDrawerWrap || chatDrawerWrap.hidden || !chatDrawerWrap.classList.contains('is-open'))) {
-        sliderChatDot.hidden = false;
+      // Show pulsating green dot at bottom right of chat button when new messages arrive while drawer is closed
+      if (chatUnreadDot && (!chatDrawerWrap || chatDrawerWrap.hidden || !chatDrawerWrap.classList.contains('is-open'))) {
+        chatUnreadDot.hidden = false;
       }
     }
 
