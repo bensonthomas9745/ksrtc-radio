@@ -3227,7 +3227,7 @@ button { color:inherit; cursor:pointer; }
   }
 
   .desktop-recent-chats.is-visible {
-    opacity: 0.85;
+    opacity: 0.5;
     visibility: visible;
     transform: translateY(0);
     pointer-events: auto;
@@ -3240,7 +3240,7 @@ button { color:inherit; cursor:pointer; }
   }
 
   .desktop-recent-chats.is-visible:hover {
-    opacity: 1 !important;
+    opacity: 0.9 !important;
   }
 
   .desktop-chat-item {
