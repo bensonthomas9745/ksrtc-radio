@@ -2429,8 +2429,8 @@ function syncDesktopRecentChatsFromDOM() {
 
 function triggerDesktopRecentChatsReveal(durationMs = 5000) {
   if (!desktopRecentChatsContainer) return;
-  // If passenger chat is already open, never pop or reveal desktop overlay
-  if (typeof isChatOpen === 'function' && isChatOpen()) {
+  // If passenger chat is already open or notifications are muted, never pop or reveal desktop overlay
+  if ((typeof isChatOpen === 'function' && isChatOpen()) || isChatNotificationMuted) {
     desktopRecentChatsContainer.classList.remove('is-visible', 'is-fading');
     return;
   }
@@ -2477,9 +2477,10 @@ function updateDesktopRecentChats(msgId, data, isLive = false) {
   saveCachedRecentChats();
   renderDesktopRecentChats();
 
-  // When a new live message comes in, reveal for 5 seconds (ONLY if chat is NOT open!)
+  // When a new live message comes in, reveal for 5 seconds (ONLY if chat is NOT open AND notifications are NOT muted!)
   if (isLive) {
     if (typeof isChatOpen === 'function' && isChatOpen()) return;
+    if (isChatNotificationMuted) return;
     triggerDesktopRecentChatsReveal(5000);
   }
 }
@@ -2530,6 +2531,7 @@ if (desktopRecentChatsContainer) {
   });
 
   desktopRecentChatsContainer.addEventListener('mouseenter', () => {
+    if (isChatNotificationMuted) return;
     clearTimeout(desktopRecentChatsTimer);
     clearTimeout(desktopRecentChatsFadeTimer);
     desktopRecentChatsContainer.classList.remove('is-fading');
@@ -4249,8 +4251,16 @@ function toggleChatNotificationSound(showToast = true) {
     localStorage.setItem(CHAT_SOUND_MUTED_KEY, isChatNotificationMuted ? 'true' : 'false');
   } catch (e) {}
   updateChatMuteUI();
+
+  // If notification off is pressed, immediately hide the left side pop up in laptop
+  if (isChatNotificationMuted && desktopRecentChatsContainer) {
+    clearTimeout(desktopRecentChatsTimer);
+    clearTimeout(desktopRecentChatsFadeTimer);
+    desktopRecentChatsContainer.classList.remove('is-visible', 'is-fading');
+  }
+
   if (showToast) {
-    notify(isChatNotificationMuted ? 'Chat notification sound muted 🔕' : 'Chat notification sound unmuted 🔔');
+    notify(isChatNotificationMuted ? 'Chat notifications muted 🔕' : 'Chat notifications unmuted 🔔');
   }
 }
 

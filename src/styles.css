@@ -1522,19 +1522,23 @@ button { color:inherit; cursor:pointer; }
 /* Scenic Header matching Mockup */
 .chat-header {
   position: relative;
+  z-index: 60;
   min-height: auto;
   padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
+  overflow: visible !important;
   background: #12151b;
   flex-shrink: 0;
 }
 .chat-header-bg-art {
   position: absolute;
   inset: 0;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  overflow: hidden;
   background: url('../assets/images/chat-header-scenic.jpg?v=3') no-repeat right 50% / cover;
   pointer-events: none;
   z-index: 0;
@@ -1612,7 +1616,7 @@ button { color:inherit; cursor:pointer; }
 }
 .chat-header-right-actions {
   position: relative;
-  z-index: 1;
+  z-index: 65;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1683,14 +1687,14 @@ button { color:inherit; cursor:pointer; }
   top: calc(100% + 8px);
   right: 40px;
   min-width: 215px;
-  background: rgba(20, 24, 32, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(22, 26, 36, 0.98);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 12px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
   padding: 6px;
-  z-index: 100;
+  z-index: 99999 !important;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -1757,6 +1761,8 @@ button { color:inherit; cursor:pointer; }
 
 /* User Profile Capsule Bar matching Mockup */
 .chat-user-bar {
+  position: relative;
+  z-index: 5;
   padding: 10px 16px 8px;
   background: #11141a;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
