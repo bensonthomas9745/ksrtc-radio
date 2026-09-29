@@ -18,6 +18,20 @@ const journey = $('journey-video'), rainVideo = $('rain-video'), stopVideo = $('
 const loadingBar = $('loading-bar'), loadingStatus = $('loading-status');
 const els = { intro:$('intro'), player:$('player'), start:$('start-journey'), replay:$('replay'), fullscreenBtn:$('fullscreen-btn'), playlistToggle:$('playlist-toggle'), album:$('album-art'), title:$('track-title'), artist:$('track-artist'), progress:$('progress'), current:$('current-time'), duration:$('duration'), play:$('play'), previous:$('previous'), next:$('next'), stop:$('make-stop'), rain:$('rain'), horn:$('horn'), bell:$('bell'), toast:$('toast'), brand:document.querySelector('.brand'), boardNow:$('board-now-btn'), busSoundToggle:$('bus-sound-toggle'), busSoundSlider:$('bus-sound-slider'), busSoundValue:$('bus-sound-value'), busSoundLabel:$('bus-sound-label'), rainSoundBar:$('rain-sound-bar'), rainSoundToggle:$('rain-sound-toggle'), rainSoundSlider:$('rain-sound-slider'), rainSoundValue:$('rain-sound-value'), rainSoundLabel:$('rain-sound-label') };
 
+// Persistent tab session ID for live presence and chat
+const mySessionId = (() => {
+  try {
+    let id = sessionStorage.getItem('ksrtc_session_id_v1');
+    if (!id) {
+      id = 's_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+      sessionStorage.setItem('ksrtc_session_id_v1', id);
+    }
+    return id;
+  } catch (e) {
+    return 's_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+  }
+})();
+
 // In-app browser detection (Instagram, Facebook, etc.)
 const isInstagramOrInApp = /(Instagram|FBAN|FBAV|Snapchat|TikTok|Line|Threads)/i.test(navigator.userAgent || '') || window.location.search.includes('inapp');
 let hasShownInstaModal = false;
@@ -76,6 +90,10 @@ const startAudio = new Audio(journeyConfig.sounds.journeyStart);
 startAudio.preload = 'auto';
 startAudio.volume = 1;
 
+const messageAudio = new Audio('./assets/audio/messagesound.wav');
+messageAudio.preload = 'auto';
+messageAudio.volume = journeyConfig.volumes.effects ?? 0.8;
+
 function preloadAudioAssets() {
   try {
     runAudio.load();
@@ -83,6 +101,7 @@ function preloadAudioAssets() {
     hornAudio.load();
     bellAudio.load();
     startAudio.load();
+    messageAudio.load();
   } catch (e) {}
 }
 
@@ -510,8 +529,6 @@ function toggleRain() {
 
 let stopFallbackTimer = null;
 
-let wasMusicPlayingBeforeStop = false;
-
 function makeStop() {
   if (state.isStopping || !state.isJourneyStarted) return;
   if (state.isRainMode) {
@@ -548,11 +565,7 @@ function makeStop() {
     journey.classList.remove('is-visible');
     stopVideo.classList.add('is-visible');
 
-    // Pause music during the stop sequence so the bus stop audio is clearly heard
-    wasMusicPlayingBeforeStop = state.isPlaying;
-    if (wasMusicPlayingBeforeStop) {
-      pauseMusic();
-    }
+    // Keep music playing continuously during the stop sequence as requested
 
     try {
       const playPromise = stopVideo.play();
@@ -956,10 +969,6 @@ function onStopEnded() {
     playSafe(journey);
     state.currentVideo = 'journey';
     syncRunAudio();
-    if (wasMusicPlayingBeforeStop) {
-      playMusic();
-      wasMusicPlayingBeforeStop = false;
-    }
     notify('Journey resumed.');
   }
 }
@@ -1066,7 +1075,7 @@ if (instaOpenBtn) {
 }
 
 /* ==========================================================================
-   Apple-Style Playlist Drawer Logic
+   Apple-Style Playlist Drawer Logic & YouTube Search
    ========================================================================== */
 const playlistToggle = $('playlist-toggle');
 const playlistDrawerWrap = $('playlist-drawer-wrap');
@@ -1076,6 +1085,8 @@ const playlistCloseBtn = $('playlist-close-btn');
 const playlistItemsScroll = $('playlist-items-scroll');
 const playlistSearch = $('playlist-search');
 const playlistSearchClear = $('playlist-search-clear');
+const playlistSuggestionsContainer = $('playlist-suggestions-container');
+const playlistSuggestionsChips = $('playlist-suggestions-chips');
 const playlistCountBadge = $('playlist-count-badge');
 const playlistSubtitle = $('playlist-subtitle');
 const drawerCurrentTitle = $('drawer-current-title');
@@ -1084,6 +1095,12 @@ const drawerJumpBtn = $('drawer-jump-btn');
 
 let drawerCloseTimer = null;
 let currentSearchFilter = '';
+let ytSuggestTimer = null;
+let ytSearchTimer = null;
+let ytSearchRequestId = 0;
+let lastYtQuery = '';
+let activeYtResults = [];
+let isSearchingYt = false;
 
 function escapeHtml(str) {
   return String(str || '')
@@ -1092,6 +1109,338 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function extractYouTubeVideoId(input) {
+  if (!input) return null;
+  const str = input.trim();
+  const match = str.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/i);
+  if (match) return match[1];
+  if (/^[\w-]{11}$/.test(str)) return str;
+  return null;
+}
+
+function fetchYouTubeSuggestions(query) {
+  return new Promise((resolve) => {
+    const q = (query || '').trim();
+    if (!q || q.length < 2) {
+      resolve([]);
+      return;
+    }
+    const callbackName = `ytSuggest_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    const script = document.createElement('script');
+    let isDone = false;
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve([]);
+    }, 2500);
+
+    function cleanup() {
+      if (isDone) return;
+      isDone = true;
+      clearTimeout(timeout);
+      try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[callbackName] = (data) => {
+      cleanup();
+      try {
+        if (data && Array.isArray(data[1])) {
+          const suggestions = data[1].map(item => (Array.isArray(item) ? item[0] : item)).filter(Boolean);
+          resolve(suggestions);
+        } else {
+          resolve([]);
+        }
+      } catch (e) {
+        resolve([]);
+      }
+    };
+
+    script.onerror = () => {
+      cleanup();
+      resolve([]);
+    };
+
+    script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(q)}&jsonp=${callbackName}`;
+    document.head.appendChild(script);
+  });
+}
+
+const PIPED_SEARCH_MIRRORS = [
+  'https://api.piped.private.coffee',
+  'https://pipedapi.ducks.party'
+];
+
+async function searchYouTubeSongs(query, requestId) {
+  const q = (query || '').trim();
+  if (!q) return [];
+
+  // Check if query is a direct video ID or URL
+  const directId = extractYouTubeVideoId(q);
+  if (directId) {
+    try {
+      const res = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${directId}`)}`);
+      if (res.ok) {
+        const info = await res.json();
+        return [{
+          id: directId,
+          title: info.title || `YouTube Video (${directId})`,
+          artist: info.author_name || 'YouTube',
+          durationStr: '',
+          albumArt: `https://img.youtube.com/vi/${directId}/hqdefault.jpg`,
+          isDirect: true
+        }];
+      }
+    } catch (_) {
+      return [{
+        id: directId,
+        title: `YouTube Video (${directId})`,
+        artist: 'YouTube',
+        durationStr: '',
+        albumArt: `https://img.youtube.com/vi/${directId}/hqdefault.jpg`,
+        isDirect: true
+      }];
+    }
+  }
+
+  for (const base of PIPED_SEARCH_MIRRORS) {
+    if (requestId !== ytSearchRequestId) return [];
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4500);
+      const res = await fetch(`${base}/search?q=${encodeURIComponent(q)}&filter=all`, {
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (requestId !== ytSearchRequestId) return [];
+
+      const rawItems = (data.items || []).filter(item => {
+        return (item.type === 'stream' || (item.url && item.url.includes('/watch?v='))) && !item.isShort;
+      });
+
+      const parsed = rawItems.map(item => {
+        const videoId = (item.url || '').replace('/watch?v=', '').split('&')[0];
+        const dur = typeof item.duration === 'number' && item.duration > 0 ? formatTime(item.duration) : '';
+        return {
+          id: videoId,
+          title: item.title || 'YouTube Track',
+          artist: item.uploaderName || 'YouTube',
+          durationStr: dur,
+          albumArt: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+          isDirect: false
+        };
+      }).filter(item => Boolean(item.id) && item.id.length === 11);
+
+      if (parsed.length > 0) {
+        return parsed;
+      }
+    } catch (_) {
+      // try next mirror
+    }
+  }
+
+  return [];
+}
+
+const ADMIN_PASSKEY_HASH = '4a1d5cc9d2ab47b32a1d81c93290bba7e549e7871f1e2babaa224b7ab2e6c946';
+const VERIFIED_TICK_SVG = `<span class="verified-tick-wrap" title="Verified Station Admin" aria-label="Verified Station Admin"><svg class="verified-tick-icon" viewBox="0 0 24 24" width="14" height="14" fill="#38bdf8" aria-hidden="true"><path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/></svg></span>`;
+
+async function sha256Hex(str) {
+  try {
+    if (!str || !window.crypto || !window.crypto.subtle) return '';
+    const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(str.trim()));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    return '';
+  }
+}
+
+let isAdminVerified = false;
+try {
+  if (localStorage.getItem('ksrtc_admin_auth_hash') === ADMIN_PASSKEY_HASH) {
+    isAdminVerified = true;
+  }
+} catch (e) {}
+
+let addSongToGlobalPlaylistFn = null;
+const SHARED_SONGS_STORAGE_KEY = 'ksrtc_community_songs_v1';
+
+function getStoredCommunitySongs() {
+  try {
+    const raw = localStorage.getItem(SHARED_SONGS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveStoredCommunitySong(song) {
+  try {
+    const list = getStoredCommunitySongs();
+    if (!list.some(s => s.id === song.id)) {
+      list.push({
+        id: song.id,
+        title: song.title,
+        artist: song.artist || 'Community Added',
+        albumArt: song.albumArt || `https://img.youtube.com/vi/${song.id}/hqdefault.jpg`,
+        isCommunityAdded: true
+      });
+      localStorage.setItem(SHARED_SONGS_STORAGE_KEY, JSON.stringify(list));
+    }
+  } catch (_) {}
+}
+
+function integrateGlobalSong(songData) {
+  if (!songData || !songData.id) return;
+  const existing = playlist.find(s => s.id === songData.id);
+  if (!existing) {
+    playlist.push({
+      id: songData.id,
+      title: songData.title,
+      artist: songData.artist || 'Community Added',
+      albumArt: songData.albumArt || `https://img.youtube.com/vi/${songData.id}/hqdefault.jpg`,
+      isCommunityAdded: true
+    });
+    saveStoredCommunitySong(songData);
+    if (playlistCountBadge) playlistCountBadge.textContent = String(playlist.length);
+    if (playlistSubtitle) playlistSubtitle.textContent = `${playlist.length} songs`;
+    if (!currentSearchFilter) {
+      renderPlaylist('');
+    }
+  } else {
+    existing.isCommunityAdded = true;
+    saveStoredCommunitySong(songData);
+    if (!currentSearchFilter) {
+      renderPlaylist('');
+    }
+  }
+}
+
+// Pre-load locally cached global/community songs
+getStoredCommunitySongs().forEach(s => integrateGlobalSong(s));
+
+function addSongToGlobalPlaylist(song) {
+  if (!song || !song.id) return;
+  integrateGlobalSong(song);
+  if (typeof addSongToGlobalPlaylistFn === 'function') {
+    addSongToGlobalPlaylistFn(song)
+      .then(() => notify(`Added "${song.title}" to Global List for everyone! 🚍`))
+      .catch(() => notify(`Added "${song.title}" to Station Playlist! 🚍`));
+  } else {
+    notify(`Added "${song.title}" to Station Playlist! 🚍`);
+  }
+}
+
+let deleteSongFromGlobalPlaylistFn = null;
+
+function removeCommunitySongFromPlaylist(songId) {
+  if (!songId) return;
+  // Remove from localStorage
+  try {
+    const list = getStoredCommunitySongs().filter(s => s.id !== songId);
+    localStorage.setItem(SHARED_SONGS_STORAGE_KEY, JSON.stringify(list));
+  } catch (_) {}
+
+  // Remove from playlist array if it was community added
+  const idx = playlist.findIndex(s => s.id === songId);
+  if (idx !== -1 && playlist[idx].isCommunityAdded) {
+    playlist.splice(idx, 1);
+    if (state.currentSongIndex >= playlist.length) {
+      state.currentSongIndex = Math.max(0, playlist.length - 1);
+    }
+    if (playlistCountBadge) playlistCountBadge.textContent = String(playlist.length);
+    if (playlistSubtitle) playlistSubtitle.textContent = `${playlist.length} songs`;
+    renderPlaylist(currentSearchFilter || '');
+  }
+}
+
+function deleteSongFromGlobalPlaylist(songId) {
+  if (!songId || !isAdminVerified) return;
+  removeCommunitySongFromPlaylist(songId);
+  if (typeof deleteSongFromGlobalPlaylistFn === 'function') {
+    deleteSongFromGlobalPlaylistFn(songId)
+      .then(() => notify('Song removed from Global List! 🗑️'))
+      .catch(() => notify('Failed to remove song.'));
+  } else {
+    notify('Song removed from Global List! 🗑️');
+  }
+}
+
+function queueTrackNext(song) {
+  if (!song || !song.id) return;
+  const insertIndex = state.currentSongIndex >= 0 ? state.currentSongIndex + 1 : playlist.length;
+
+  const existingIdx = playlist.findIndex(s => s.id === song.id);
+  if (existingIdx !== -1) {
+    if (existingIdx === insertIndex) {
+      notify(`"${song.title}" is already playing next! ⏭`);
+      return;
+    }
+    const [item] = playlist.splice(existingIdx, 1);
+    const targetIdx = existingIdx < state.currentSongIndex ? state.currentSongIndex : state.currentSongIndex + 1;
+    playlist.splice(targetIdx, 0, item);
+  } else {
+    playlist.splice(insertIndex, 0, {
+      id: song.id,
+      title: song.title,
+      artist: song.artist || 'YouTube',
+      albumArt: song.albumArt || `https://img.youtube.com/vi/${song.id}/hqdefault.jpg`
+    });
+    if (playlistCountBadge) playlistCountBadge.textContent = String(playlist.length);
+    if (playlistSubtitle) playlistSubtitle.textContent = `${playlist.length} songs`;
+  }
+
+  notify(`Up Next: ${song.title} ⏭`);
+  if (!currentSearchFilter) {
+    renderPlaylist('');
+  }
+  updatePlaylistActiveState();
+}
+
+function playCustomSong(song) {
+  if (!song || !song.id) return;
+  let existingIndex = playlist.findIndex(s => s.id === song.id);
+  if (existingIndex === -1) {
+    const insertIdx = state.currentSongIndex >= 0 ? state.currentSongIndex + 1 : playlist.length;
+    playlist.splice(insertIdx, 0, {
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      albumArt: song.albumArt || `https://img.youtube.com/vi/${song.id}/hqdefault.jpg`
+    });
+    existingIndex = insertIdx;
+    if (playlistCountBadge) playlistCountBadge.textContent = String(playlist.length);
+    if (playlistSubtitle) playlistSubtitle.textContent = `${playlist.length} songs`;
+  }
+
+  if (!state.isJourneyStarted) {
+    startJourney();
+  }
+
+  setTrack(existingIndex, true);
+  updatePlaylistActiveState();
+  notify(`Playing: ${song.title}`);
+}
+
+function renderSuggestions(suggestions) {
+  if (!playlistSuggestionsContainer || !playlistSuggestionsChips) return;
+  if (!suggestions || suggestions.length === 0) {
+    playlistSuggestionsContainer.hidden = true;
+    playlistSuggestionsChips.innerHTML = '';
+    return;
+  }
+
+  playlistSuggestionsChips.innerHTML = suggestions.slice(0, 8).map(s => `
+    <button type="button" class="search-suggest-chip" data-suggest="${escapeHtml(s)}">
+      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <span>${escapeHtml(s)}</span>
+    </button>
+  `).join('');
+  playlistSuggestionsContainer.hidden = false;
 }
 
 function updatePlaylistActiveState() {
@@ -1104,7 +1453,7 @@ function updatePlaylistActiveState() {
   }
 
   if (!playlistItemsScroll) return;
-  const items = playlistItemsScroll.querySelectorAll('.playlist-item');
+  const items = playlistItemsScroll.querySelectorAll('.playlist-item[data-index]');
   items.forEach(item => {
     const idx = parseInt(item.dataset.index, 10);
     const isCurrent = idx === state.currentSongIndex;
@@ -1113,44 +1462,226 @@ function updatePlaylistActiveState() {
   });
 }
 
-function renderPlaylist(filter = '') {
+function renderPlaylistSearchResults(filter, localMatches, ytResults, searchingYt) {
   if (!playlistItemsScroll) return;
-  currentSearchFilter = filter.trim().toLowerCase();
+  let html = '';
 
-  const filtered = playlist
-    .map((song, index) => ({ song, index }))
-    .filter(({ song }) => {
-      if (!currentSearchFilter) return true;
-      return song.title.toLowerCase().includes(currentSearchFilter) ||
-             song.artist.toLowerCase().includes(currentSearchFilter);
-    });
+  const directItem = ytResults.find(r => r.isDirect);
+  if (directItem) {
+    const isAdded = playlist.some(s => s.id === directItem.id && s.isCommunityAdded);
+    html += `
+      <div class="yt-direct-card" data-yt-id="${escapeHtml(directItem.id)}" data-yt-title="${escapeHtml(directItem.title)}" data-yt-artist="${escapeHtml(directItem.artist)}" data-yt-thumb="${escapeHtml(directItem.albumArt)}">
+        <div class="yt-direct-thumb-wrap">
+          <img src="${directItem.albumArt}" alt="" />
+        </div>
+        <div class="yt-direct-info">
+          <span class="yt-direct-tag">YouTube Link / Video</span>
+          <div class="yt-direct-title">${escapeHtml(directItem.title)}</div>
+          <div class="yt-direct-artist">${escapeHtml(directItem.artist)}</div>
+        </div>
+        <div class="yt-actions">
+          <button type="button" class="yt-direct-play-btn" title="Play Now">▶ Play</button>
+          <button type="button" class="yt-next-pill" title="Play Next in Queue">⏭ Next</button>
+          <button type="button" class="yt-add-global-pill ${isAdded ? 'is-added' : ''}" title="Add to station playlist for everyone">${isAdded ? '✓ Added' : '+ Global List'}</button>
+        </div>
+      </div>
+    `;
+  }
 
-  if (filtered.length === 0) {
-    playlistItemsScroll.innerHTML = `<div class="playlist-empty-state">No songs found matching "${escapeHtml(filter)}"</div>`;
+  if (localMatches.length > 0) {
+    html += `
+      <div class="playlist-section-header">
+        <span>In KSRTC Playlist</span>
+        <span class="section-count">${localMatches.length}</span>
+      </div>
+    `;
+    html += localMatches.map(({ song, index }) => {
+      const isCurrent = index === state.currentSongIndex;
+      const isPlaying = isCurrent && state.isPlaying;
+      return `
+        <div class="playlist-item ${isCurrent ? 'is-current' : ''} ${isPlaying ? 'is-playing' : ''}" role="button" tabindex="0" data-index="${index}" aria-label="Play ${escapeHtml(song.title)}">
+          <span class="item-index">${index + 1}</span>
+          <div class="item-thumb-wrap">
+            <img class="item-thumb" src="${song.albumArt}" alt="" loading="lazy" />
+            <div class="item-eq-bars" aria-hidden="true">
+              <i></i><i></i><i></i>
+            </div>
+          </div>
+          <div class="item-meta">
+            <div class="item-title">
+              ${escapeHtml(song.title)}
+              ${song.isCommunityAdded ? '<span class="community-badge" title="Added by Passenger">Global</span>' : ''}
+            </div>
+            <div class="item-artist">${escapeHtml(song.artist)}</div>
+          </div>
+          <div class="item-actions">
+            ${(isAdminVerified && song.isCommunityAdded) ? `
+              <button type="button" class="item-delete-global-btn" data-id="${escapeHtml(song.id)}" data-title="${escapeHtml(song.title)}" title="Delete from Global List" aria-label="Delete song from Global List">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-6 5v6m4-6v6"/></svg>
+              </button>
+            ` : ''}
+            <button type="button" class="item-play-next-btn" data-index="${index}" title="Play next in queue">Play Next</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // YouTube section
+  html += `
+    <div class="playlist-section-header yt-section-header">
+      <div class="yt-header-title">
+        <svg class="yt-icon" viewBox="0 0 24 24" width="15" height="15" fill="#ef4444"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        <span>YouTube Songs</span>
+      </div>
+      <span class="yt-badge-pill">Search Any Song</span>
+    </div>
+  `;
+
+  if (searchingYt) {
+    html += `
+      <div class="yt-searching-state">
+        <div class="spinner-dot"></div>
+        <span>Searching YouTube for "${escapeHtml(filter)}"...</span>
+      </div>
+    `;
+  } else {
+    const listItems = ytResults.filter(r => !r.isDirect);
+    if (listItems.length > 0) {
+      html += listItems.map(item => {
+        const isAdded = playlist.some(s => s.id === item.id && s.isCommunityAdded);
+        return `
+          <div class="playlist-item yt-playlist-item"
+            data-yt-id="${escapeHtml(item.id)}"
+            data-yt-title="${escapeHtml(item.title)}"
+            data-yt-artist="${escapeHtml(item.artist)}"
+            data-yt-thumb="${escapeHtml(item.albumArt)}"
+            aria-label="${escapeHtml(item.title)} from YouTube">
+            <div class="item-thumb-wrap">
+              <img class="item-thumb" src="${item.albumArt}" alt="" loading="lazy" />
+              ${item.durationStr ? `<span class="yt-item-duration">${escapeHtml(item.durationStr)}</span>` : ''}
+            </div>
+            <div class="item-meta">
+              <div class="item-title">${escapeHtml(item.title)}</div>
+              <div class="item-artist">${escapeHtml(item.artist)}</div>
+            </div>
+            <div class="yt-actions">
+              <button type="button" class="yt-play-pill" title="Play Now">▶ Play</button>
+              <button type="button" class="yt-next-pill" title="Play Next in Queue">⏭ Next</button>
+              <button type="button" class="yt-add-global-pill ${isAdded ? 'is-added' : ''}" title="Add to station playlist for everyone">${isAdded ? '✓ Added' : '+ Global List'}</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else if (localMatches.length === 0 && !directItem) {
+      html += `
+        <div class="yt-empty-state">
+          No songs found. Try another query or paste a YouTube video link.
+        </div>
+      `;
+    }
+  }
+
+  playlistItemsScroll.innerHTML = html;
+  updatePlaylistActiveState();
+}
+
+function renderPlaylist(filter = '', isImmediate = false) {
+  if (!playlistItemsScroll) return;
+  const raw = (filter || '').trim();
+  currentSearchFilter = raw.toLowerCase();
+
+  if (!raw) {
+    clearTimeout(ytSuggestTimer);
+    clearTimeout(ytSearchTimer);
+    renderSuggestions([]);
+    activeYtResults = [];
+    lastYtQuery = '';
+    isSearchingYt = false;
+
+    playlistItemsScroll.innerHTML = playlist.map((song, index) => {
+      const isCurrent = index === state.currentSongIndex;
+      const isPlaying = isCurrent && state.isPlaying;
+      return `
+        <div class="playlist-item ${isCurrent ? 'is-current' : ''} ${isPlaying ? 'is-playing' : ''}" role="button" tabindex="0" data-index="${index}" aria-label="Play ${escapeHtml(song.title)}">
+          <span class="item-index">${index + 1}</span>
+          <div class="item-thumb-wrap">
+            <img class="item-thumb" src="${song.albumArt}" alt="" loading="lazy" />
+            <div class="item-eq-bars" aria-hidden="true">
+              <i></i><i></i><i></i>
+            </div>
+          </div>
+          <div class="item-meta">
+            <div class="item-title">
+              ${escapeHtml(song.title)}
+              ${song.isCommunityAdded ? '<span class="community-badge" title="Added by Passenger">Global</span>' : ''}
+            </div>
+            <div class="item-artist">${escapeHtml(song.artist)}</div>
+          </div>
+          <div class="item-actions">
+            ${(isAdminVerified && song.isCommunityAdded) ? `
+              <button type="button" class="item-delete-global-btn" data-id="${escapeHtml(song.id)}" data-title="${escapeHtml(song.title)}" title="Delete from Global List" aria-label="Delete song from Global List">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-6 5v6m4-6v6"/></svg>
+              </button>
+            ` : ''}
+            <button type="button" class="item-play-next-btn" data-index="${index}" title="Play next in queue">Play Next</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    updatePlaylistActiveState();
     return;
   }
 
-  playlistItemsScroll.innerHTML = filtered.map(({ song, index }) => {
-    const isCurrent = index === state.currentSongIndex;
-    const isPlaying = isCurrent && state.isPlaying;
-    return `
-      <button type="button" class="playlist-item ${isCurrent ? 'is-current' : ''} ${isPlaying ? 'is-playing' : ''}" data-index="${index}" aria-label="Play ${escapeHtml(song.title)}">
-        <span class="item-index">${index + 1}</span>
-        <div class="item-thumb-wrap">
-          <img class="item-thumb" src="${song.albumArt}" alt="" loading="lazy" />
-          <div class="item-eq-bars" aria-hidden="true">
-            <i></i><i></i><i></i>
-          </div>
-        </div>
-        <div class="item-meta">
-          <div class="item-title">${escapeHtml(song.title)}</div>
-          <div class="item-artist">${escapeHtml(song.artist)}</div>
-        </div>
-      </button>
-    `;
-  }).join('');
+  // Filter local tracks
+  const localMatches = playlist
+    .map((song, index) => ({ song, index }))
+    .filter(({ song }) => {
+      const t = (song.title || '').toLowerCase();
+      const a = (song.artist || '').toLowerCase();
+      return t.includes(currentSearchFilter) || a.includes(currentSearchFilter);
+    });
 
-  updatePlaylistActiveState();
+  // Fetch search suggestions (debounced 160ms)
+  clearTimeout(ytSuggestTimer);
+  ytSuggestTimer = setTimeout(async () => {
+    if (raw.length >= 2) {
+      const suggestions = await fetchYouTubeSuggestions(raw);
+      if (currentSearchFilter) {
+        renderSuggestions(suggestions);
+      }
+    } else {
+      renderSuggestions([]);
+    }
+  }, 160);
+
+  // If search query changed, schedule YouTube search
+  if (raw !== lastYtQuery) {
+    clearTimeout(ytSearchTimer);
+    isSearchingYt = true;
+    renderPlaylistSearchResults(raw, localMatches, activeYtResults, isSearchingYt);
+
+    const runYtSearch = async () => {
+      ytSearchRequestId += 1;
+      const reqId = ytSearchRequestId;
+      const results = await searchYouTubeSongs(raw, reqId);
+      if (reqId === ytSearchRequestId) {
+        isSearchingYt = false;
+        lastYtQuery = raw;
+        activeYtResults = results;
+        renderPlaylistSearchResults(raw, localMatches, activeYtResults, isSearchingYt);
+      }
+    };
+
+    if (isImmediate) {
+      runYtSearch();
+    } else {
+      ytSearchTimer = setTimeout(runYtSearch, 380);
+    }
+  } else {
+    renderPlaylistSearchResults(raw, localMatches, activeYtResults, isSearchingYt);
+  }
 }
 
 function scrollToCurrentSong() {
@@ -1211,6 +1742,90 @@ if (playlistBackdrop) {
 
 if (playlistItemsScroll) {
   playlistItemsScroll.addEventListener('click', (e) => {
+    // 1. Explicit Add to Global List (+ Global List)
+    const addGlobalBtn = e.target.closest('.yt-add-global-pill');
+    if (addGlobalBtn) {
+      e.stopPropagation();
+      const parent = addGlobalBtn.closest('.yt-playlist-item, .yt-direct-card');
+      if (parent) {
+        const id = parent.dataset.ytId;
+        const title = parent.dataset.ytTitle || 'YouTube Song';
+        const artist = parent.dataset.ytArtist || 'YouTube';
+        const albumArt = parent.dataset.ytThumb || `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+        if (id) {
+          const confirmed = confirm(
+            `Add "${title}" to the Global Station Playlist?\n\n` +
+            `This song will be added to the live playlist for everyone aboard the journey. ` +
+            `Please only add it if the song is suitable and enjoyable for all passengers.`
+          );
+          if (!confirmed) return;
+
+          addSongToGlobalPlaylist({ id, title, artist, albumArt });
+          addGlobalBtn.classList.add('is-added');
+          addGlobalBtn.textContent = '✓ Added';
+        }
+      }
+      return;
+    }
+
+    // 2. Play Next on YouTube item (⏭ Next)
+    const ytNextBtn = e.target.closest('.yt-next-pill');
+    if (ytNextBtn) {
+      e.stopPropagation();
+      const parent = ytNextBtn.closest('.yt-playlist-item, .yt-direct-card');
+      if (parent) {
+        const id = parent.dataset.ytId;
+        const title = parent.dataset.ytTitle || 'YouTube Song';
+        const artist = parent.dataset.ytArtist || 'YouTube';
+        const albumArt = parent.dataset.ytThumb || `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+        if (id) {
+          queueTrackNext({ id, title, artist, albumArt });
+        }
+      }
+      return;
+    }
+
+    // Admin Delete from Global List (🗑️)
+    const delGlobalBtn = e.target.closest('.item-delete-global-btn');
+    if (delGlobalBtn) {
+      e.stopPropagation();
+      if (!isAdminVerified) {
+        notify('Admin authorization required.');
+        return;
+      }
+      const songId = delGlobalBtn.dataset.id;
+      const songTitle = delGlobalBtn.dataset.title || 'this song';
+      if (confirm(`Remove "${songTitle}" from the Global Station Playlist for everyone?`)) {
+        deleteSongFromGlobalPlaylist(songId);
+      }
+      return;
+    }
+
+    // 3. Play Next on Curated / Local playlist item
+    const itemNextBtn = e.target.closest('.item-play-next-btn');
+    if (itemNextBtn) {
+      e.stopPropagation();
+      const index = parseInt(itemNextBtn.dataset.index, 10);
+      if (!Number.isNaN(index) && playlist[index]) {
+        queueTrackNext(playlist[index]);
+      }
+      return;
+    }
+
+    // 4. YouTube result or direct video play (card click or ▶ Play button)
+    const ytItem = e.target.closest('.yt-playlist-item, .yt-direct-card');
+    if (ytItem) {
+      const id = ytItem.dataset.ytId;
+      const title = ytItem.dataset.ytTitle || 'YouTube Song';
+      const artist = ytItem.dataset.ytArtist || 'YouTube';
+      const albumArt = ytItem.dataset.ytThumb || `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+      if (id) {
+        playCustomSong({ id, title, artist, albumArt });
+      }
+      return;
+    }
+
+    // 5. Curated local playlist item click
     const itemBtn = e.target.closest('.playlist-item');
     if (!itemBtn) return;
     const index = parseInt(itemBtn.dataset.index, 10);
@@ -1223,6 +1838,30 @@ if (playlistItemsScroll) {
       notify(`Playing: ${playlist[index].title}`);
     }
   });
+
+  // Support keyboard Enter or Space on focused playlist-item
+  playlistItemsScroll.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      if (e.target.classList.contains('playlist-item') && !e.target.closest('.item-actions, .yt-actions')) {
+        e.preventDefault();
+        e.target.click();
+      }
+    }
+  });
+}
+
+if (playlistSuggestionsChips) {
+  playlistSuggestionsChips.addEventListener('click', (e) => {
+    const chip = e.target.closest('.search-suggest-chip');
+    if (!chip) return;
+    const q = chip.dataset.suggest;
+    if (q && playlistSearch) {
+      playlistSearch.value = q;
+      if (playlistSearchClear) playlistSearchClear.hidden = false;
+      renderSuggestions([]);
+      renderPlaylist(q, true);
+    }
+  });
 }
 
 if (playlistSearch) {
@@ -1231,7 +1870,7 @@ if (playlistSearch) {
     if (playlistSearchClear) {
       playlistSearchClear.hidden = !val;
     }
-    renderPlaylist(val);
+    renderPlaylist(val, false);
   });
 }
 
@@ -1242,12 +1881,21 @@ if (playlistSearchClear) {
       playlistSearch.focus();
     }
     playlistSearchClear.hidden = true;
+    renderSuggestions([]);
     renderPlaylist('');
   });
 }
 
 if (drawerJumpBtn) {
-  drawerJumpBtn.addEventListener('click', scrollToCurrentSong);
+  drawerJumpBtn.addEventListener('click', () => {
+    if (!state.isJourneyStarted) {
+      startJourney();
+    }
+    const nextIdx = (state.currentSongIndex + 1) % playlist.length;
+    setTrack(nextIdx, true);
+    notify(`Playing next: ${playlist[nextIdx].title} ⏭`);
+    setTimeout(scrollToCurrentSong, 80);
+  });
 }
 
 window.addEventListener('keydown', (e) => {
@@ -1355,6 +2003,8 @@ const chatSystemNoteClose = $('chat-system-note-close');
 const chatPopBubble = $('chat-pop-bubble');
 const chatPopSender = $('chat-pop-sender');
 const chatPopText = $('chat-pop-text');
+const desktopRecentChatsContainer = $('desktop-recent-chats');
+const desktopRecentChatsList = [];
 const chatReplyBar = $('chat-reply-bar');
 const chatReplyBarAccent = $('chat-reply-bar-accent');
 const chatReplyBarTitle = $('chat-reply-bar-title');
@@ -1434,25 +2084,7 @@ function updateGenderUI() {
   }
 }
 
-const ADMIN_PASSKEY_HASH = '4a1d5cc9d2ab47b32a1d81c93290bba7e549e7871f1e2babaa224b7ab2e6c946';
-const VERIFIED_TICK_SVG = `<span class="verified-tick-wrap" title="Verified Station Admin" aria-label="Verified Station Admin"><svg class="verified-tick-icon" viewBox="0 0 24 24" width="14" height="14" fill="#38bdf8" aria-hidden="true"><path d="m10.06 2.37.89-.9c.58-.59 1.52-.59 2.1 0l.89.9a1.5 1.5 0 0 0 1.25.43l1.26-.14c.83-.09 1.59.46 1.76 1.28l.26 1.24c.17.82.77 1.48 1.57 1.71l1.21.36c.8.24 1.28 1.07 1.11 1.9l-.26 1.24a1.5 1.5 0 0 0 .43 1.25l.9.89c.59.58.59 1.52 0 2.1l-.9.89a1.5 1.5 0 0 0-.43 1.25l.26 1.24c.17.83-.31 1.66-1.11 1.9l-1.21.36a1.5 1.5 0 0 0-1.57 1.71l-.26 1.24c-.17.82-.93 1.37-1.76 1.28l-1.26-.14a1.5 1.5 0 0 0-1.25.43l-.89.9c-.58.59-1.52.59-2.1 0l-.89-.9a1.5 1.5 0 0 0-1.25-.43l-1.26.14c-.83.09-1.59-.46-1.76-1.28l-.26-1.24a1.5 1.5 0 0 0-1.57-1.71l-1.21-.36c-.8-.24-1.28-1.07-1.11-1.9l.26-1.24a1.5 1.5 0 0 0-.43-1.25l-.9-.89c-.59-.58-.59-1.52 0-2.1l.9-.89a1.5 1.5 0 0 0 .43-1.25l-.26-1.24c-.17-.83.31-1.66 1.11-1.9l1.21-.36a1.5 1.5 0 0 0 1.57-1.71l.26-1.24c.17-.82.93-1.37 1.76-1.28l1.26.14a1.5 1.5 0 0 0 1.25-.43Zm3.82 7.05-3.88 3.88-1.76-1.76a.75.75 0 0 0-1.06 1.06l2.29 2.29c.3.3.77.3 1.06 0l4.41-4.41a.75.75 0 0 0-1.06-1.06Z"/></svg></span>`;
 
-async function sha256Hex(str) {
-  try {
-    if (!str || !window.crypto || !window.crypto.subtle) return '';
-    const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(str.trim()));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  } catch (e) {
-    return '';
-  }
-}
-
-let isAdminVerified = false;
-try {
-  if (localStorage.getItem('ksrtc_admin_auth_hash') === ADMIN_PASSKEY_HASH) {
-    isAdminVerified = true;
-  }
-} catch (e) {}
 
 function updateAdminUI() {
   const verifiedBadge = $('chat-verified-badge');
@@ -1469,6 +2101,9 @@ function updateAdminUI() {
   if (chatUsernameInput && isAdminVerified) {
     chatUsernameInput.value = 'Admin';
     chatUsernameInput.style.color = '#38bdf8';
+  }
+  if (typeof renderPlaylist === 'function') {
+    renderPlaylist(currentSearchFilter || '');
   }
 }
 
@@ -1503,12 +2138,14 @@ function getPassengerColor(name) {
   return PASSENGER_COLORS[Math.abs(hash) % PASSENGER_COLORS.length];
 }
 
+
 /* ==========================================================================
    Apple-Style Pop-up Message Balloon (Floats on top of the song slider)
    ========================================================================== */
 function triggerSongPoppingMessage(senderName, text, color, isVerified = false, gender = '', replyTo = null) {
   if (!chatPopBubble || !chatPopSender || !chatPopText) return;
   if (!senderName || senderName.toLowerCase() === 'system') return;
+  if (typeof isChatOpen === 'function' && isChatOpen()) return;
 
   clearTimeout(popBubbleTimer);
   clearTimeout(popBubbleFadeTimer);
@@ -1555,6 +2192,248 @@ if (chatPopBubble) {
   });
 }
 
+/* ==========================================================================
+   Desktop Live Chat Overlay Stream (Bottom-Left Corner on Computer)
+   Shows exact recent 5 messages directly from Passenger Chat & Firebase for 5 seconds
+   ========================================================================== */
+let desktopRecentChatsTimer = null;
+let desktopRecentChatsFadeTimer = null;
+
+const RECENT_CHATS_STORAGE_KEY = 'ksrtc_desktop_recent_chats_v2';
+try {
+  localStorage.removeItem('ksrtc_desktop_recent_chats_v1');
+} catch (e) {}
+
+function loadCachedRecentChats() {
+  try {
+    const raw = localStorage.getItem(RECENT_CHATS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(item => item && item.id && !String(item.id).startsWith('def_') && item.name && item.text);
+      }
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveCachedRecentChats() {
+  try {
+    const validItems = desktopRecentChatsList.filter(item => item && item.id && !String(item.id).startsWith('def_')).slice(-5);
+    localStorage.setItem(RECENT_CHATS_STORAGE_KEY, JSON.stringify(validItems));
+  } catch (e) {}
+}
+
+function getRecentChatItemFromData(msgId, data) {
+  if (!msgId || !data || msgId === '_pinned' || String(msgId).startsWith('def_')) return null;
+  const senderName = (data.name || 'Passenger').slice(0, 24);
+  if (senderName.toLowerCase() === 'system' || data.session === 'system_bot') return null;
+
+  const text = (data.text || '').trim();
+  const snippet = text || (data.imageUrl ? '📷 Shared a photo' : (data.gifUrl ? '🎞️ Shared a GIF' : ''));
+  if (!snippet) return null;
+
+  const isMe = data.session === mySessionId;
+  const isVerified = Boolean(
+    (data.isAdmin === true && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH)) ||
+    (senderName.toLowerCase() === 'admin' && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH || data.isAdmin === true)) ||
+    (isMe && isAdminVerified)
+  );
+
+  let displayName = senderName;
+  if (isMe) {
+    displayName = isVerified ? '👑 You' : 'You';
+  } else if (isVerified) {
+    displayName = '👑 Admin';
+  }
+  const tagColor = isVerified ? '#f5c871' : (isMe ? '#38bdf8' : getPassengerColor(senderName));
+
+  return { id: msgId, name: displayName, text: snippet, color: tagColor, isMe: Boolean(isMe) };
+}
+
+function renderDesktopRecentChats() {
+  if (!desktopRecentChatsContainer) return;
+  const realItems = desktopRecentChatsList.filter(item => item && item.id && !String(item.id).startsWith('def_')).slice(-5);
+  if (realItems.length === 0) {
+    desktopRecentChatsContainer.innerHTML = '';
+    return;
+  }
+  desktopRecentChatsContainer.innerHTML = realItems.map(item => `
+    <div class="desktop-chat-item ${item.isMe ? 'is-me' : ''}" data-id="${escapeHtml(item.id)}" title="Click to open Passenger Chat">
+      <span class="desktop-chat-sender ${item.isMe ? 'is-me' : ''}" style="color: ${item.color || '#38bdf8'};">${escapeHtml(item.name)}:</span>
+      <span class="desktop-chat-text">${escapeHtml(item.text)}</span>
+    </div>
+  `).join('');
+}
+
+function syncDesktopRecentChatsFromDOM() {
+  if (!chatMessagesContainer) return;
+  const msgRows = chatMessagesContainer.querySelectorAll('.chat-msg-row[data-id], .chat-msg[data-id]');
+  if (msgRows.length === 0) return;
+  const recentRows = Array.from(msgRows).filter(row => {
+    const id = row.dataset.id;
+    return id && id !== '_pinned' && !id.startsWith('def_');
+  }).slice(-5);
+  if (recentRows.length === 0) return;
+
+  const syncedList = [];
+  recentRows.forEach(row => {
+    const id = row.dataset.id;
+    const senderEl = row.querySelector('.chat-sender-name') || row.querySelector('.chat-msg-sender');
+    const textEl = row.querySelector('.chat-msg-text');
+    const mediaBadge = row.querySelector('.chat-msg-gif-badge');
+    const hasPhoto = row.querySelector('.chat-msg-media-img:not(.chat-msg-gif-img)');
+    let snippet = textEl ? textEl.textContent.trim() : '';
+    if (!snippet) {
+      if (mediaBadge) snippet = '🎞️ Shared a GIF';
+      else if (hasPhoto) snippet = '📷 Shared a photo';
+    }
+    const isMe = row.classList.contains('is-me');
+    const isVerified = Boolean(row.querySelector('.chat-admin-sender-name, .verified-tick-icon') || row.classList.contains('is-admin-msg'));
+    const rawName = senderEl ? senderEl.textContent.trim().replace(/^👑\s*/, '') : 'Passenger';
+    let displayName = rawName;
+    if (isMe) {
+      displayName = isVerified ? '👑 You' : 'You';
+    } else if (isVerified) {
+      displayName = '👑 Admin';
+    }
+    const color = isVerified ? '#f5c871' : (isMe ? '#38bdf8' : (row.querySelector('.chat-msg-sender')?.style?.color || getPassengerColor(rawName)));
+    if (snippet) {
+      syncedList.push({ id, name: displayName, text: snippet, color, isMe: Boolean(isMe) });
+    }
+  });
+
+  if (syncedList.length > 0) {
+    desktopRecentChatsList.length = 0;
+    desktopRecentChatsList.push(...syncedList);
+    saveCachedRecentChats();
+    renderDesktopRecentChats();
+  }
+}
+
+function triggerDesktopRecentChatsReveal(durationMs = 5000) {
+  if (!desktopRecentChatsContainer) return;
+  // If passenger chat is already open, never pop or reveal desktop overlay
+  if (typeof isChatOpen === 'function' && isChatOpen()) {
+    desktopRecentChatsContainer.classList.remove('is-visible', 'is-fading');
+    return;
+  }
+  if (desktopRecentChatsList.length === 0) {
+    syncDesktopRecentChatsFromDOM();
+  }
+  const realItems = desktopRecentChatsList.filter(item => item && item.id && !String(item.id).startsWith('def_'));
+  if (realItems.length === 0) {
+    desktopRecentChatsContainer.classList.remove('is-visible', 'is-fading');
+    return;
+  }
+  renderDesktopRecentChats();
+
+  clearTimeout(desktopRecentChatsTimer);
+  clearTimeout(desktopRecentChatsFadeTimer);
+
+  desktopRecentChatsContainer.classList.remove('is-fading');
+  desktopRecentChatsContainer.classList.add('is-visible');
+
+  desktopRecentChatsTimer = setTimeout(() => {
+    desktopRecentChatsContainer.classList.add('is-fading');
+    desktopRecentChatsFadeTimer = setTimeout(() => {
+      desktopRecentChatsContainer.classList.remove('is-visible');
+      desktopRecentChatsContainer.classList.remove('is-fading');
+    }, 400);
+  }, durationMs);
+}
+
+function updateDesktopRecentChats(msgId, data, isLive = false) {
+  if (!desktopRecentChatsContainer || !data) return;
+  const item = getRecentChatItemFromData(msgId, data);
+  if (!item) return;
+
+  const existingIdx = desktopRecentChatsList.findIndex(i => i.id === msgId);
+  if (existingIdx !== -1) {
+    desktopRecentChatsList[existingIdx] = item;
+  } else {
+    desktopRecentChatsList.push(item);
+    if (desktopRecentChatsList.length > 5) {
+      desktopRecentChatsList.shift();
+    }
+  }
+
+  saveCachedRecentChats();
+  renderDesktopRecentChats();
+
+  // When a new live message comes in, reveal for 5 seconds (ONLY if chat is NOT open!)
+  if (isLive) {
+    if (typeof isChatOpen === 'function' && isChatOpen()) return;
+    triggerDesktopRecentChatsReveal(5000);
+  }
+}
+
+// Load cached actual messages on initialization
+desktopRecentChatsList.push(...loadCachedRecentChats());
+if (desktopRecentChatsList.length === 0) {
+  syncDesktopRecentChatsFromDOM();
+} else {
+  renderDesktopRecentChats();
+}
+
+// Fast-boot: Fetch exact latest messages directly from Firebase
+try {
+  fetch('https://ksrtc-radio-default-rtdb.firebaseio.com/messages.json')
+    .then(r => r.json())
+    .then(data => {
+      if (!data || typeof data !== 'object') return;
+      const keys = Object.keys(data).filter(k => k !== '_pinned' && !k.startsWith('def_'));
+      if (keys.length === 0) return;
+      keys.sort((a, b) => ((data[a] && data[a].timestamp) || 0) - ((data[b] && data[b].timestamp) || 0));
+      const latest5 = keys.slice(-5);
+      const fetchedItems = latest5.map(k => getRecentChatItemFromData(k, data[k])).filter(Boolean);
+      if (fetchedItems.length > 0) {
+        desktopRecentChatsList.length = 0;
+        desktopRecentChatsList.push(...fetchedItems);
+        saveCachedRecentChats();
+        renderDesktopRecentChats();
+      }
+    })
+    .catch(() => {});
+} catch (e) {}
+
+if (desktopRecentChatsContainer) {
+  desktopRecentChatsContainer.addEventListener('click', (e) => {
+    const item = e.target.closest('.desktop-chat-item');
+    openChatDrawer();
+    if (item && item.dataset.id && chatMessagesContainer) {
+      setTimeout(() => {
+        const target = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${item.dataset.id}"], .chat-msg[data-id="${item.dataset.id}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.classList.add('is-highlighted');
+          setTimeout(() => target.classList.remove('is-highlighted'), 1400);
+        }
+      }, 200);
+    }
+  });
+
+  desktopRecentChatsContainer.addEventListener('mouseenter', () => {
+    clearTimeout(desktopRecentChatsTimer);
+    clearTimeout(desktopRecentChatsFadeTimer);
+    desktopRecentChatsContainer.classList.remove('is-fading');
+    desktopRecentChatsContainer.classList.add('is-visible');
+  });
+
+  desktopRecentChatsContainer.addEventListener('mouseleave', () => {
+    clearTimeout(desktopRecentChatsTimer);
+    desktopRecentChatsTimer = setTimeout(() => {
+      desktopRecentChatsContainer.classList.add('is-fading');
+      desktopRecentChatsFadeTimer = setTimeout(() => {
+        desktopRecentChatsContainer.classList.remove('is-visible');
+        desktopRecentChatsContainer.classList.remove('is-fading');
+      }, 400);
+    }, 3000);
+  });
+
+  renderDesktopRecentChats();
+}
+
 // Station Welcome & Guidelines Note dismissal handling
 if (chatSystemNote) {
   try {
@@ -1592,6 +2471,19 @@ function openChatDrawer() {
   void chatDrawerWrap.offsetWidth;
   chatDrawerWrap.classList.add('is-open');
   if (chatToggle) chatToggle.setAttribute('aria-expanded', 'true');
+
+  // Dismiss any floating popups or desktop overlays when chat drawer is opened
+  if (desktopRecentChatsContainer) {
+    clearTimeout(desktopRecentChatsTimer);
+    clearTimeout(desktopRecentChatsFadeTimer);
+    desktopRecentChatsContainer.classList.remove('is-visible', 'is-fading');
+  }
+  if (chatPopBubble) {
+    clearTimeout(popBubbleTimer);
+    clearTimeout(popBubbleFadeTimer);
+    chatPopBubble.hidden = true;
+    chatPopBubble.classList.remove('is-popping', 'is-leaving', 'is-admin-pop');
+  }
 
   // Keep glowing green dot visible full-time as requested
   if (chatUnreadDot) {
@@ -1881,7 +2773,6 @@ function initLiveSessionsAndChat() {
   const STORAGE_KEY = 'ksrtc_live_sessions_v1';
   const HEARTBEAT_INTERVAL = 2500;
   const SESSION_TTL = 7000;
-  const mySessionId = 's_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
 
   const firebaseConfig = {
     apiKey: "AIzaSyDQFHMh1WXH7er-Q-L-hrQ2hEilqOuL5LA",
@@ -2013,6 +2904,21 @@ function initLiveSessionsAndChat() {
     const senderEl = $('chat-pinned-sender');
     const textEl = $('chat-pinned-text');
     const unpinBtn = $('chat-unpin-btn');
+
+    // Update real-time state of all chat pin buttons in message stream
+    if (chatMessagesContainer) {
+      const allPinBtns = chatMessagesContainer.querySelectorAll('.chat-pin-btn');
+      allPinBtns.forEach(btn => {
+        const isThisPinned = Boolean(data && data.id && btn.dataset.id === data.id);
+        btn.classList.toggle('is-pinned', isThisPinned);
+        btn.title = isThisPinned ? 'Unpin message' : 'Pin message';
+        const label = btn.querySelector('.chat-pin-label');
+        if (label) {
+          label.textContent = isThisPinned ? 'Pinned' : 'Pin';
+        }
+      });
+    }
+
     if (!card) return;
 
     if (!data || !data.text) {
@@ -2072,7 +2978,7 @@ function initLiveSessionsAndChat() {
     }
   }
 
-  // Initial local fallback for likes
+  // Initial local fallback for likes and pins
   toggleLikeChatMessageFn = (msgId) => {
     const has = localLikedMsgIds.has(msgId);
     if (has) localLikedMsgIds.delete(msgId);
@@ -2081,6 +2987,41 @@ function initLiveSessionsAndChat() {
     updateMessageLikeUI(msgId, count, localLikedMsgIds.has(msgId));
     return Promise.resolve();
   };
+
+  pinChatMessageFn = (msgId, name, text, isVerified, gender = 'M') => {
+    if (!isAdminVerified) return Promise.reject(new Error('Unauthorized'));
+    const data = {
+      id: msgId,
+      name,
+      text,
+      gender: gender || 'M',
+      isVerified: Boolean(isVerified),
+      timestamp: Date.now()
+    };
+    renderPinnedCard(data);
+    try {
+      localStorage.setItem('ksrtc_pinned_chat_v1', JSON.stringify(data));
+      if (channel) channel.postMessage({ type: 'pin', data });
+    } catch (e) {}
+    return Promise.resolve();
+  };
+
+  unpinChatMessageFn = () => {
+    if (!isAdminVerified) return Promise.reject(new Error('Unauthorized'));
+    renderPinnedCard(null);
+    try {
+      localStorage.removeItem('ksrtc_pinned_chat_v1');
+      if (channel) channel.postMessage({ type: 'unpin' });
+    } catch (e) {}
+    return Promise.resolve();
+  };
+
+  try {
+    const savedPinned = localStorage.getItem('ksrtc_pinned_chat_v1');
+    if (savedPinned) {
+      renderPinnedCard(JSON.parse(savedPinned));
+    }
+  } catch (e) {}
 
   function appendChatMessage(msgId, data, isLive = false) {
     if (!chatMessagesContainer || seenMessageIds.has(msgId)) return;
@@ -2104,10 +3045,13 @@ function initLiveSessionsAndChat() {
       (isMe && isAdminVerified)
     );
 
-    if (isVerified) {
-      senderName = 'Admin';
-    } else if (senderName.toLowerCase() === 'admin') {
-      senderName = 'Passenger';
+    let displayName = senderName;
+    if (isMe) {
+      displayName = isVerified ? '👑 You' : 'You';
+    } else if (isVerified) {
+      displayName = '👑 Admin';
+    } else if (displayName.toLowerCase() === 'admin') {
+      displayName = 'Passenger';
     }
 
     const text = (data.text || '').trim();
@@ -2125,8 +3069,10 @@ function initLiveSessionsAndChat() {
     const genderHtml = `<span class="chat-gender-tag gender-${gender.toLowerCase()}" title="${gender === 'M' ? 'Male' : 'Female'}">${escapeHtml(gender)}</span>`;
 
     const senderHtml = isVerified
-      ? `<span class="chat-sender-name chat-admin-sender-name">👑 ${escapeHtml(senderName)}</span> ${genderHtml} ${VERIFIED_TICK_SVG} <span class="chat-admin-pill-tag">OFFICIAL</span>`
-      : `<span class="chat-sender-name">${escapeHtml(senderName)}</span> ${genderHtml}`;
+      ? `<span class="chat-sender-name chat-admin-sender-name">${escapeHtml(displayName)}</span> ${genderHtml} ${VERIFIED_TICK_SVG} <span class="chat-admin-pill-tag">OFFICIAL</span>`
+      : (isMe
+          ? `<span class="chat-sender-name chat-me-sender-name" style="color: #38bdf8;">You</span> ${genderHtml}`
+          : `<span class="chat-sender-name">${escapeHtml(displayName)}</span> ${genderHtml}`);
 
     const adminBannerHtml = isVerified
       ? `<div class="chat-admin-bubble-banner">
@@ -2189,6 +3135,8 @@ function initLiveSessionsAndChat() {
     const hasMedia = Boolean(data.imageUrl || data.gifUrl);
     const isMediaOnly = hasMedia && !text && !replyQuoteHtml && !adminBannerHtml;
 
+    const isPinned = Boolean(currentPinnedMessage && currentPinnedMessage.id === msgId);
+
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg-row ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''} is-gender-${gender.toLowerCase()}`;
     msgEl.dataset.id = msgId;
@@ -2218,7 +3166,7 @@ function initLiveSessionsAndChat() {
             <span>Reply</span>
           </button>
           <div class="chat-admin-actions">
-            <button type="button" class="chat-admin-action-btn chat-pin-btn" data-id="${escapeHtml(msgId)}" title="Pin message" aria-label="Pin message">
+            <button type="button" class="chat-admin-action-btn chat-pin-btn ${isPinned ? 'is-pinned' : ''}" data-id="${escapeHtml(msgId)}" title="${isPinned ? 'Unpin message' : 'Pin message'}" aria-label="Pin message">
               <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/></svg>
             </button>
             <button type="button" class="chat-admin-action-btn chat-delete-btn" data-id="${escapeHtml(msgId)}" title="Delete message" aria-label="Delete message">
@@ -2235,11 +3183,12 @@ function initLiveSessionsAndChat() {
 
     chatMessagesContainer.appendChild(msgEl);
 
-    // Enforce keeping only the last 10 messages in the chatbox
-    const allMsgs = chatMessagesContainer.querySelectorAll('.chat-msg-row, .chat-msg');
-    if (allMsgs.length > 10) {
-      for (let i = 0; i < allMsgs.length - 10; i++) {
-        const oldMsg = allMsgs[i];
+    // Enforce keeping only the last 30 unpinned messages in the chatbox
+    const allMsgs = Array.from(chatMessagesContainer.querySelectorAll('.chat-msg-row, .chat-msg'));
+    const prunableMsgs = allMsgs.filter(msg => !(currentPinnedMessage && msg.dataset.id === currentPinnedMessage.id));
+    if (prunableMsgs.length > 30) {
+      const toRemove = prunableMsgs.slice(0, prunableMsgs.length - 30);
+      toRemove.forEach(oldMsg => {
         if (oldMsg && oldMsg.dataset.id) {
           seenMessageIds.delete(oldMsg.dataset.id);
           if (likeListenerUnsubs.has(oldMsg.dataset.id)) {
@@ -2248,18 +3197,26 @@ function initLiveSessionsAndChat() {
           }
         }
         oldMsg.remove();
-      }
+      });
     }
 
     if (isMe || isScrolledToBottom || isChatOpen()) {
       chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
     }
 
-    // Trigger 2-second popping message on top of the song slider for live messages!
+    // Live message incoming: play message sound for incoming messages (even when chat is not opened)
+    if (isLive && !isMe) {
+      playSoundEffect(messageAudio);
+    }
+
+    // Live message incoming: trigger popping message (on mobile)
     if (isLive) {
       const popSnippet = text || (hasImage ? '📷 Shared a photo' : (hasGif ? '🎞️ Shared a GIF' : ''));
-      triggerSongPoppingMessage(senderName, popSnippet, tagColor, isVerified, gender, data.replyTo);
+      triggerSongPoppingMessage(displayName, popSnippet, tagColor, isVerified, gender, data.replyTo);
     }
+
+    // Always update the desktop recent 5 chats overlay (shows for 5s on live messages)
+    updateDesktopRecentChats(msgId, data, isLive);
 
     // Keep glowing green dot visible full-time as requested
     if (chatUnreadDot) {
@@ -2347,19 +3304,19 @@ function initLiveSessionsAndChat() {
         return;
       }
 
-      // 5. Admin pin
+      // 5. Pin / Unpin button click (Admin only)
       const pinBtn = e.target.closest('.chat-pin-btn');
       if (pinBtn) {
-        const msgId = pinBtn.getAttribute('data-id');
         if (!isAdminVerified) {
           notify('Admin authorization required.');
           return;
         }
-        const msgEl = pinBtn.closest('.chat-msg');
+        const msgId = pinBtn.getAttribute('data-id');
+        const msgEl = pinBtn.closest('.chat-msg-row, .chat-msg');
         if (!msgEl) return;
         const senderName = msgEl.querySelector('.chat-sender-name')?.textContent || 'Passenger';
         const text = msgEl.querySelector('.chat-msg-text')?.textContent || '';
-        const isVerifiedSender = Boolean(msgEl.querySelector('.verified-tick-icon'));
+        const isVerifiedSender = Boolean(msgEl.querySelector('.chat-admin-sender-name, .verified-tick-icon'));
         const genderEl = msgEl.querySelector('.chat-gender-tag');
         const msgGender = genderEl ? (genderEl.textContent.trim() || 'M') : 'M';
 
@@ -2374,9 +3331,10 @@ function initLiveSessionsAndChat() {
 
         if (typeof pinChatMessageFn === 'function') {
           pinChatMessageFn(msgId, senderName, text, isVerifiedSender, msgGender)
-            .then(() => notify('Message pinned to top!'))
+            .then(() => notify('Message pinned to top! 📌'))
             .catch(() => notify('Failed to pin message.'));
         }
+        return;
       }
     });
   }
@@ -2385,7 +3343,10 @@ function initLiveSessionsAndChat() {
   if (chatUnpinBtn) {
     chatUnpinBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (!isAdminVerified) return;
+      if (!isAdminVerified) {
+        notify('Admin authorization required.');
+        return;
+      }
       if (typeof unpinChatMessageFn === 'function') {
         unpinChatMessageFn()
           .then(() => notify('Message unpinned.'))
@@ -2399,7 +3360,7 @@ function initLiveSessionsAndChat() {
     chatPinnedCard.addEventListener('click', (e) => {
       if (e.target.closest('#chat-unpin-btn')) return;
       if (currentPinnedMessage && currentPinnedMessage.id && chatMessagesContainer) {
-        const target = chatMessagesContainer.querySelector(`.chat-msg[data-id="${currentPinnedMessage.id}"]`);
+        const target = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${currentPinnedMessage.id}"], .chat-msg[data-id="${currentPinnedMessage.id}"]`);
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'center' });
           target.classList.add('is-highlighted');
@@ -2460,23 +3421,24 @@ function initLiveSessionsAndChat() {
         }
       });
 
-      // Live Passenger Chat (strictly last 10 messages)
+      // Live Passenger Chat (strictly last 30 messages)
       const messagesRef = ref(db, 'messages');
-      const recentMessagesQuery = query(messagesRef, limitToLast(10));
+      const recentMessagesQuery = query(messagesRef, limitToLast(30));
       let isInitialChatHistoryLoaded = false;
 
       function autoPruneOldMessages() {
         get(messagesRef).then((snap) => {
           const val = snap.val();
           if (!val || typeof val !== 'object') return;
-          const keys = Object.keys(val).filter(k => k !== '_pinned');
-          if (keys.length > 10) {
+          const pinnedId = (val._pinned && val._pinned.id) || (currentPinnedMessage && currentPinnedMessage.id) || null;
+          const keys = Object.keys(val).filter(k => k !== '_pinned' && k !== pinnedId);
+          if (keys.length > 30) {
             keys.sort((a, b) => {
               const tA = (val[a] && val[a].timestamp) || 0;
               const tB = (val[b] && val[b].timestamp) || 0;
               return tA - tB;
             });
-            const toDelete = keys.slice(0, keys.length - 10);
+            const toDelete = keys.slice(0, keys.length - 30);
             toDelete.forEach((oldId) => {
               remove(ref(db, `messages/${oldId}`)).catch(() => {});
             });
@@ -2507,32 +3469,86 @@ function initLiveSessionsAndChat() {
           renderPinnedCard(null);
           return;
         }
+        // Protect pinned message from being removed from chat stream when query window slides forward
+        if (currentPinnedMessage && currentPinnedMessage.id === snapshot.key) {
+          return;
+        }
         if (likeListenerUnsubs.has(snapshot.key)) {
           try { likeListenerUnsubs.get(snapshot.key)(); } catch (e) {}
           likeListenerUnsubs.delete(snapshot.key);
         }
         if (!chatMessagesContainer) return;
-        const msgEl = chatMessagesContainer.querySelector(`.chat-msg[data-id="${snapshot.key}"]`);
+        const msgEl = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${snapshot.key}"], .chat-msg[data-id="${snapshot.key}"]`);
         if (msgEl) {
           msgEl.style.opacity = '0';
           msgEl.style.transform = 'scale(0.92)';
           setTimeout(() => {
             msgEl.remove();
             seenMessageIds.delete(snapshot.key);
-            if (chatMessagesContainer.querySelectorAll('.chat-msg').length === 0 && chatEmptyState) {
+            if (chatMessagesContainer.querySelectorAll('.chat-msg-row, .chat-msg').length === 0 && chatEmptyState) {
               chatEmptyState.style.display = 'block';
             }
           }, 200);
         }
-        if (currentPinnedMessage && currentPinnedMessage.id === snapshot.key) {
-          renderPinnedCard(null);
+        const dIdx = desktopRecentChatsList.findIndex(item => item.id === snapshot.key);
+        if (dIdx !== -1) {
+          desktopRecentChatsList.splice(dIdx, 1);
+          saveCachedRecentChats();
+          renderDesktopRecentChats();
         }
       });
 
       const pinnedRef = ref(db, 'messages/_pinned');
       onValue(pinnedRef, (snapshot) => {
-        renderPinnedCard(snapshot.val());
+        const pinData = snapshot.val();
+        renderPinnedCard(pinData);
+        if (pinData && pinData.id && chatMessagesContainer) {
+          const existing = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${pinData.id}"], .chat-msg[data-id="${pinData.id}"]`);
+          if (!existing) {
+            get(ref(db, `messages/${pinData.id}`)).then((mSnap) => {
+              const mVal = mSnap.val();
+              if (mVal && typeof mVal === 'object') {
+                appendChatMessage(pinData.id, mVal, false);
+              }
+            }).catch(() => {});
+          }
+        }
       });
+
+      // Global Community Songs Sync (Firebase Realtime Database)
+      const sharedSongsRef = ref(db, 'shared_songs');
+      onChildAdded(sharedSongsRef, (snapshot) => {
+        const val = snapshot.val();
+        if (val && val.id) {
+          integrateGlobalSong(val);
+        }
+      });
+
+      onChildRemoved(sharedSongsRef, (snapshot) => {
+        const val = snapshot.val();
+        const removedId = (val && val.id) || snapshot.key;
+        if (removedId) {
+          removeCommunitySongFromPlaylist(removedId);
+        }
+      });
+
+      addSongToGlobalPlaylistFn = (song) => {
+        if (!song || !song.id) return Promise.reject();
+        const safeId = String(song.id).replace(/[.#$[\]]/g, '_');
+        return set(ref(db, `shared_songs/${safeId}`), {
+          id: song.id,
+          title: song.title,
+          artist: song.artist || 'Community Added',
+          albumArt: song.albumArt || `https://img.youtube.com/vi/${song.id}/hqdefault.jpg`,
+          addedAt: serverTimestamp()
+        });
+      };
+
+      deleteSongFromGlobalPlaylistFn = (songId) => {
+        if (!isAdminVerified || !songId) return Promise.reject(new Error('Unauthorized'));
+        const safeId = String(songId).replace(/[.#$[\]]/g, '_');
+        return remove(ref(db, `shared_songs/${safeId}`));
+      };
 
       // Enable live popping on top of song after initial chat backlog finishes loading
       setTimeout(() => {
@@ -2562,6 +3578,7 @@ function initLiveSessionsAndChat() {
       };
 
       pinChatMessageFn = (msgId, name, text, isVerified, gender = 'M') => {
+        if (!isAdminVerified) return Promise.reject(new Error('Unauthorized'));
         return set(ref(db, 'messages/_pinned'), {
           id: msgId,
           name: name,
@@ -2574,7 +3591,10 @@ function initLiveSessionsAndChat() {
       };
 
       unpinChatMessageFn = () => {
-        return remove(ref(db, 'messages/_pinned'));
+        if (!isAdminVerified) return Promise.reject(new Error('Unauthorized'));
+        return remove(ref(db, 'messages/_pinned')).then(() => {
+          autoPruneOldMessages();
+        });
       };
 
       sendChatMessageFn = (name, text, isSenderAdmin = false, gender = 'M', replyTo = null, mediaAttachment = null) => {
