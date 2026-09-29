@@ -2101,6 +2101,19 @@ const chatForm = $('chat-form');
 const chatMessageInput = $('chat-message-input');
 const chatSendBtn = $('chat-send-btn');
 const chatUnreadDot = $('chat-unread-dot');
+const CHAT_SOUND_MUTED_KEY = 'ksrtc_chat_sound_muted';
+let isChatNotificationMuted = false;
+try {
+  isChatNotificationMuted = localStorage.getItem(CHAT_SOUND_MUTED_KEY) === 'true';
+} catch (e) {
+  isChatNotificationMuted = false;
+}
+const chatMuteBtn = $('chat-mute-btn');
+const chatOptionsMenu = $('chat-options-menu');
+const chatOptionsToggleSound = $('chat-options-toggle-sound');
+const chatOptionsSoundIcon = $('chat-options-sound-icon');
+const chatOptionsSoundLabel = $('chat-options-sound-label');
+const chatOptionsViewRules = $('chat-options-view-rules');
 const chatSystemNote = $('chat-system-note');
 const chatSystemNoteClose = $('chat-system-note-close');
 const chatPopBubble = $('chat-pop-bubble');
@@ -2615,6 +2628,8 @@ function closeChatDrawer() {
   if (!chatDrawerWrap) return;
   chatDrawerWrap.classList.remove('is-open');
   if (chatToggle) chatToggle.setAttribute('aria-expanded', 'false');
+  if (chatOptionsMenu) chatOptionsMenu.hidden = true;
+  if (chatOptionsBtn) chatOptionsBtn.setAttribute('aria-expanded', 'false');
   clearTimeout(chatDrawerCloseTimer);
   chatDrawerCloseTimer = setTimeout(() => {
     if (!chatDrawerWrap.classList.contains('is-open')) {
@@ -3308,8 +3323,8 @@ function initLiveSessionsAndChat() {
       chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
     }
 
-    // Live message incoming: play message sound for incoming messages (even when chat is not opened)
-    if (isLive && !isMe) {
+    // Live message incoming: play message sound for incoming messages (even when chat is not opened), if not muted
+    if (isLive && !isMe && !isChatNotificationMuted) {
       playSoundEffect(messageAudio);
     }
 
@@ -4204,8 +4219,65 @@ if (quickChipsContainer) {
 }
 
 const chatOptionsBtn = $('chat-options-btn');
-if (chatOptionsBtn) {
-  chatOptionsBtn.addEventListener('click', () => {
+
+function updateChatMuteUI() {
+  if (chatMuteBtn) {
+    if (isChatNotificationMuted) {
+      chatMuteBtn.classList.add('is-muted');
+      chatMuteBtn.setAttribute('title', 'Unmute notification sound');
+      chatMuteBtn.setAttribute('aria-label', 'Unmute notification sound');
+      chatMuteBtn.setAttribute('aria-pressed', 'true');
+    } else {
+      chatMuteBtn.classList.remove('is-muted');
+      chatMuteBtn.setAttribute('title', 'Mute notification sound');
+      chatMuteBtn.setAttribute('aria-label', 'Mute notification sound');
+      chatMuteBtn.setAttribute('aria-pressed', 'false');
+    }
+  }
+
+  if (chatOptionsSoundLabel) {
+    chatOptionsSoundLabel.textContent = isChatNotificationMuted ? 'Unmute notification sound' : 'Mute notification sound';
+  }
+  if (chatOptionsSoundIcon) {
+    chatOptionsSoundIcon.textContent = isChatNotificationMuted ? '🔕' : '🔔';
+  }
+}
+
+function toggleChatNotificationSound(showToast = true) {
+  isChatNotificationMuted = !isChatNotificationMuted;
+  try {
+    localStorage.setItem(CHAT_SOUND_MUTED_KEY, isChatNotificationMuted ? 'true' : 'false');
+  } catch (e) {}
+  updateChatMuteUI();
+  if (showToast) {
+    notify(isChatNotificationMuted ? 'Chat notification sound muted 🔕' : 'Chat notification sound unmuted 🔔');
+  }
+}
+
+// Initial UI sync
+updateChatMuteUI();
+
+if (chatMuteBtn) {
+  chatMuteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleChatNotificationSound(true);
+  });
+}
+
+if (chatOptionsToggleSound) {
+  chatOptionsToggleSound.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleChatNotificationSound(true);
+    if (chatOptionsMenu) chatOptionsMenu.hidden = true;
+    if (chatOptionsBtn) chatOptionsBtn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+if (chatOptionsViewRules) {
+  chatOptionsViewRules.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (chatOptionsMenu) chatOptionsMenu.hidden = true;
+    if (chatOptionsBtn) chatOptionsBtn.setAttribute('aria-expanded', 'false');
     if (chatSystemNote) {
       chatSystemNote.hidden = false;
       chatSystemNote.style.opacity = '1';
@@ -4215,3 +4287,39 @@ if (chatOptionsBtn) {
     }
   });
 }
+
+if (chatOptionsBtn) {
+  chatOptionsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!chatOptionsMenu) {
+      if (chatSystemNote) {
+        chatSystemNote.hidden = false;
+        chatSystemNote.style.opacity = '1';
+        chatSystemNote.style.transform = 'none';
+        try { localStorage.removeItem(CHAT_NOTE_DISMISSED_KEY); } catch (e) {}
+        notify('KSRTC Radio guidelines opened.');
+      }
+      return;
+    }
+    const isHidden = chatOptionsMenu.hidden;
+    chatOptionsMenu.hidden = !isHidden;
+    chatOptionsBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+  });
+}
+
+// Close options menu when clicking anywhere outside or pressing Esc
+document.addEventListener('click', (e) => {
+  if (chatOptionsMenu && !chatOptionsMenu.hidden) {
+    if (!chatOptionsMenu.contains(e.target) && (!chatOptionsBtn || !chatOptionsBtn.contains(e.target))) {
+      chatOptionsMenu.hidden = true;
+      if (chatOptionsBtn) chatOptionsBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && chatOptionsMenu && !chatOptionsMenu.hidden) {
+    chatOptionsMenu.hidden = true;
+    if (chatOptionsBtn) chatOptionsBtn.setAttribute('aria-expanded', 'false');
+  }
+});
