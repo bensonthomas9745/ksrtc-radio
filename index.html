@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=54" />
+    <link rel="stylesheet" href="./src/styles.css?v=55" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -406,6 +406,37 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         </div>
       </div>
 
+      <!-- Apple-Style Global Song Add Confirmation Modal -->
+      <div id="global-add-modal" class="global-add-modal" hidden aria-modal="true" role="dialog" aria-labelledby="global-add-modal-title">
+        <div class="global-add-backdrop" id="global-add-backdrop"></div>
+        <div class="global-add-card">
+          <div class="global-add-icon-badge">
+            <span>🌐</span>
+          </div>
+
+          <h3 id="global-add-modal-title" class="global-add-title">Add to Global Playlist?</h3>
+          
+          <div class="global-add-song-preview">
+            <div class="global-add-thumb-wrap">
+              <img id="global-add-thumb" src="" alt="" />
+            </div>
+            <div class="global-add-song-info">
+              <div class="global-add-song-title" id="global-add-song-title">Song Title</div>
+              <div class="global-add-song-artist" id="global-add-song-artist">Artist</div>
+            </div>
+          </div>
+
+          <p class="global-add-desc">
+            This track will be added to the live station playlist for <strong>everyone aboard the journey</strong>. Please only add songs that are enjoyable for all passengers.
+          </p>
+
+          <div class="global-add-actions">
+            <button type="button" class="global-add-btn confirm" id="global-add-confirm-btn">Add for Everyone</button>
+            <button type="button" class="global-add-btn cancel" id="global-add-cancel-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Apple-Style Playlist Drawer / Sheet -->
       <div id="playlist-drawer-wrap" class="playlist-drawer-wrap" hidden aria-modal="true" role="dialog" aria-label="Playing List">
         <div class="playlist-backdrop" id="playlist-backdrop"></div>
@@ -417,11 +448,15 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               <h2 class="playlist-title">Playing List</h2>
               <span class="playlist-subtitle" id="playlist-subtitle">169 songs</span>
             </div>
-            <button type="button" class="drawer-about-link drawer-whats-new-link" id="whats-new-open-btn" title="What's New in KSRTC Radio">What’s New</button>
-            <a href="/about" class="drawer-about-link" title="About KSRTC Radio">About</a>
-            <button type="button" class="playlist-close-btn" id="playlist-close-btn" aria-label="Close playing list">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
+            <div class="playlist-header-right">
+              <button type="button" class="playlist-header-pill whats-new-pill" id="whats-new-open-btn" title="What's New in KSRTC Radio">
+                <span>✨ What’s New</span>
+              </button>
+              <a href="/about" class="playlist-header-pill about-pill" title="About KSRTC Radio">About</a>
+              <button type="button" class="playlist-close-btn" id="playlist-close-btn" aria-label="Close playing list" title="Close">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
           </header>
 
           <div class="playlist-search-wrap">
@@ -674,6 +709,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=66"></script>
+    <script type="module" src="./src/app.js?v=67"></script>
   </body>
 </html>

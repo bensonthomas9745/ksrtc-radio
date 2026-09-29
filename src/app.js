@@ -93,8 +93,67 @@ document.addEventListener('keydown', (e) => {
     if (modal && !modal.hidden) {
       hideWhatsNewModal();
     }
+    const gModal = $('global-add-modal');
+    if (gModal && !gModal.hidden) {
+      hideGlobalAddModal();
+    }
   }
 });
+
+// Apple-Style Global Song Add Confirmation Modal Controller
+const globalAddModal = $('global-add-modal');
+const globalAddBackdrop = $('global-add-backdrop');
+const globalAddConfirmBtn = $('global-add-confirm-btn');
+const globalAddCancelBtn = $('global-add-cancel-btn');
+const globalAddThumb = $('global-add-thumb');
+const globalAddTitle = $('global-add-song-title');
+const globalAddArtist = $('global-add-song-artist');
+
+let pendingGlobalAddSong = null;
+let pendingGlobalAddBtn = null;
+
+function showGlobalAddModal(song, btn) {
+  if (!globalAddModal || !song) return;
+  pendingGlobalAddSong = song;
+  pendingGlobalAddBtn = btn;
+
+  if (globalAddTitle) globalAddTitle.textContent = song.title;
+  if (globalAddArtist) globalAddArtist.textContent = song.artist || 'YouTube';
+  if (globalAddThumb) globalAddThumb.src = song.albumArt || `https://img.youtube.com/vi/${song.id}/hqdefault.jpg`;
+
+  globalAddModal.hidden = false;
+  globalAddModal.classList.remove('is-closing');
+}
+
+function hideGlobalAddModal() {
+  if (!globalAddModal) return;
+  globalAddModal.classList.add('is-closing');
+  setTimeout(() => {
+    globalAddModal.hidden = true;
+    globalAddModal.classList.remove('is-closing');
+    pendingGlobalAddSong = null;
+    pendingGlobalAddBtn = null;
+  }, 160);
+}
+
+if (globalAddConfirmBtn) {
+  globalAddConfirmBtn.addEventListener('click', () => {
+    if (pendingGlobalAddSong) {
+      addSongToGlobalPlaylist(pendingGlobalAddSong);
+      if (pendingGlobalAddBtn) {
+        pendingGlobalAddBtn.classList.add('is-added');
+        pendingGlobalAddBtn.textContent = '✓ Added';
+      }
+    }
+    hideGlobalAddModal();
+  });
+}
+if (globalAddCancelBtn) {
+  globalAddCancelBtn.addEventListener('click', hideGlobalAddModal);
+}
+if (globalAddBackdrop) {
+  globalAddBackdrop.addEventListener('click', hideGlobalAddModal);
+}
 
 // Initialize first track metadata in DOM
 els.title.textContent = playlist[0].title;
@@ -1806,16 +1865,7 @@ if (playlistItemsScroll) {
         const artist = parent.dataset.ytArtist || 'YouTube';
         const albumArt = parent.dataset.ytThumb || `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
         if (id) {
-          const confirmed = confirm(
-            `Add "${title}" to the Global Station Playlist?\n\n` +
-            `This song will be added to the live playlist for everyone aboard the journey. ` +
-            `Please only add it if the song is suitable and enjoyable for all passengers.`
-          );
-          if (!confirmed) return;
-
-          addSongToGlobalPlaylist({ id, title, artist, albumArt });
-          addGlobalBtn.classList.add('is-added');
-          addGlobalBtn.textContent = '✓ Added';
+          showGlobalAddModal({ id, title, artist, albumArt }, addGlobalBtn);
         }
       }
       return;

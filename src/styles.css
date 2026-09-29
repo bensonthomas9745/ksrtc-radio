@@ -598,6 +598,68 @@ button { color:inherit; cursor:pointer; }
   transform: scale(0.94);
 }
 
+.playlist-header-right {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+}
+
+.playlist-header-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DM Sans', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 5px 10px;
+  border-radius: 999px;
+  text-decoration: none;
+  cursor: pointer;
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(235, 235, 245, 0.85);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1;
+}
+
+.playlist-header-pill:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.32);
+  transform: translateY(-1px);
+}
+
+.playlist-header-pill:active {
+  transform: scale(0.96);
+}
+
+.playlist-header-pill.whats-new-pill {
+  background: rgba(245, 200, 113, 0.12);
+  border-color: rgba(245, 200, 113, 0.35);
+  color: #fde047;
+}
+
+.playlist-header-pill.whats-new-pill:hover {
+  background: rgba(245, 200, 113, 0.24);
+  border-color: rgba(245, 200, 113, 0.55);
+  color: #ffffff;
+}
+
+.playlist-header-pill.about-pill {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(235, 235, 245, 0.8);
+}
+
+.playlist-header-pill.about-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
 .playlist-search-wrap {
   position: relative;
   padding: 10px 18px 8px;
@@ -3589,4 +3651,190 @@ button.drawer-whats-new-link {
   .whats-new-title {
     font-size: 16px;
   }
+}
+
+/* ==========================================================================
+   Apple-Style Global Song Add Confirmation Modal
+   ========================================================================== */
+.global-add-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  animation: appleFadeIn 0.2s ease-out both;
+  user-select: none;
+}
+
+.global-add-modal[hidden] {
+  display: none !important;
+}
+
+.global-add-modal.is-closing {
+  animation: appleFadeOut 0.16s ease-in forwards;
+}
+
+.global-add-modal.is-closing .global-add-card {
+  animation: appleScaleDown 0.16s ease-in forwards;
+}
+
+.global-add-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+}
+
+.global-add-card {
+  position: relative;
+  z-index: 2;
+  width: min(340px, calc(100vw - 36px));
+  background: rgba(30, 32, 38, 0.88);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  padding: 22px 20px 18px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.25);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'DM Sans', sans-serif;
+  animation: appleScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  box-sizing: border-box;
+}
+
+.global-add-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 200, 113, 0.25) 0%, rgba(245, 200, 113, 0.05) 100%);
+  border: 1px solid rgba(245, 200, 113, 0.4);
+  font-size: 22px;
+  margin-bottom: 12px;
+  box-shadow: 0 0 20px rgba(245, 200, 113, 0.2);
+}
+
+.global-add-title {
+  margin: 0 0 12px;
+  font-size: 16.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #ffffff;
+  line-height: 1.3;
+}
+
+.global-add-song-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.global-add-thumb-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  flex-shrink: 0;
+}
+
+.global-add-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.global-add-song-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.global-add-song-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.global-add-song-artist {
+  font-size: 11px;
+  color: rgba(235, 235, 245, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.global-add-desc {
+  margin: 0 0 18px;
+  font-size: 12.2px;
+  line-height: 1.45;
+  color: rgba(235, 235, 245, 0.72);
+  text-align: center;
+}
+
+.global-add-desc strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.global-add-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.global-add-btn {
+  width: 100%;
+  height: 38px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.global-add-btn:active {
+  transform: scale(0.98);
+}
+
+.global-add-btn.confirm {
+  background: #0a84ff;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(10, 132, 255, 0.35);
+}
+
+.global-add-btn.confirm:hover {
+  background: #0077ed;
+  transform: translateY(-1px);
+}
+
+.global-add-btn.cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(235, 235, 245, 0.85);
+  font-weight: 500;
+}
+
+.global-add-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
 }
