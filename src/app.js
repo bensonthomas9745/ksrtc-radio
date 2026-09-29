@@ -188,6 +188,10 @@ document.addEventListener('keydown', (e) => {
     if (gModal && !gModal.hidden) {
       hideGlobalAddModal();
     }
+    const vModal = $('chat-views-modal');
+    if (vModal && !vModal.hidden && typeof hideChatMessageViewsDetails === 'function') {
+      hideChatMessageViewsDetails();
+    }
   }
 });
 
@@ -2388,6 +2392,14 @@ let currentReplyTo = null;
 let toggleLikeChatMessageFn = null;
 const localLikedMsgIds = new Set();
 const likeListenerUnsubs = new Map();
+const viewListenerUnsubs = new Map();
+const messageViewsData = new Map();
+const recordedViewMsgIds = new Set();
+const pendingViewQueue = new Set();
+let viewFlushTimer = null;
+let activeViewsModalMsgId = null;
+let recordMessageBatchViewsFn = null;
+let recordMessageViewFn = null;
 
 let chatDrawerCloseTimer = null;
 let lastChatMessageTime = 0;
@@ -2447,12 +2459,23 @@ function updateAdminUI() {
   if (unpinBtn) {
     unpinBtn.hidden = !isAdminVerified;
   }
+  const pinnedViewsBtn = $('chat-pinned-views-btn');
+  if (pinnedViewsBtn) {
+    pinnedViewsBtn.hidden = !isAdminVerified || !currentPinnedMessage || !currentPinnedMessage.id;
+  }
   if (chatUsernameInput && isAdminVerified) {
     chatUsernameInput.value = 'Admin';
     chatUsernameInput.style.color = '#38bdf8';
   }
   if (typeof renderPlaylist === 'function') {
     renderPlaylist(currentSearchFilter || '');
+  }
+  if (chatMessagesContainer && isAdminVerified && typeof messageViewsData !== 'undefined') {
+    messageViewsData.forEach((vVal, mId) => {
+      if (typeof updateMessageViewsUI === 'function') {
+        updateMessageViewsUI(mId, vVal);
+      }
+    });
   }
 }
 
@@ -2675,6 +2698,11 @@ function triggerDesktopRecentChatsReveal(durationMs = 5000) {
     desktopRecentChatsContainer.classList.remove('is-visible', 'is-fading');
     return;
   }
+  realItems.forEach(item => {
+    if (item && item.id && typeof queueMessageView === 'function') {
+      queueMessageView(item.id);
+    }
+  });
   renderDesktopRecentChats();
 
   clearTimeout(desktopRecentChatsTimer);
@@ -2827,6 +2855,16 @@ function openChatDrawer() {
   }
   if (chatUnreadDot) {
     chatUnreadDot.hidden = true;
+  }
+
+  // Record views for all messages visible in drawer
+  if (chatMessagesContainer) {
+    const renderedMsgs = chatMessagesContainer.querySelectorAll('.chat-msg-row[data-id], .chat-msg[data-id]');
+    renderedMsgs.forEach(el => {
+      if (el.dataset.id && typeof queueMessageView === 'function') {
+        queueMessageView(el.dataset.id);
+      }
+    });
   }
 
   // Dismiss any floating popups or desktop overlays when chat drawer is opened
@@ -3303,6 +3341,17 @@ function initLiveSessionsAndChat() {
     if (unpinBtn) {
       unpinBtn.hidden = !isAdminVerified;
     }
+    const pinnedViewsBtn = $('chat-pinned-views-btn');
+    if (pinnedViewsBtn) {
+      pinnedViewsBtn.hidden = !isAdminVerified || !data || !data.id;
+      if (data && data.id) {
+        const v = (typeof messageViewsData !== 'undefined' && messageViewsData.get(data.id)) || {};
+        const count = Object.keys(v).length;
+        const countEl = $('chat-pinned-views-count');
+        if (countEl) countEl.textContent = String(count);
+        pinnedViewsBtn.title = `Pinned message seen by ${count} passenger${count === 1 ? '' : 's'} (Click for details)`;
+      }
+    }
     card.hidden = false;
   }
 
@@ -3330,6 +3379,267 @@ function initLiveSessionsAndChat() {
       const tapback = bubble.querySelector('.chat-tapback-badge');
       if (tapback) tapback.remove();
     }
+  }
+
+  // --- Message View Tracking & Admin Details Controller ---
+  function formatRelativeTime(ts) {
+    if (!ts) return '';
+    const now = Date.now();
+    const diffSec = Math.max(0, Math.floor((now - Number(ts)) / 1000));
+    if (diffSec < 45) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDay = Math.floor(diffHour / 24);
+    return `${diffDay}d ago`;
+  }
+
+  function hasLocalViewRecorded(msgId) {
+    if (recordedViewMsgIds.has(msgId)) return true;
+    try {
+      if (sessionStorage.getItem(`ksrtc_viewed_${msgId}`)) {
+        recordedViewMsgIds.add(msgId);
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function queueMessageView(msgId) {
+    if (!msgId || msgId === '_pinned' || hasLocalViewRecorded(msgId)) return;
+    recordedViewMsgIds.add(msgId);
+    try {
+      sessionStorage.setItem(`ksrtc_viewed_${msgId}`, '1');
+    } catch (_) {}
+
+    pendingViewQueue.add(msgId);
+    if (!viewFlushTimer) {
+      viewFlushTimer = setTimeout(flushPendingViews, 250);
+    }
+  }
+
+  function flushPendingViews() {
+    viewFlushTimer = null;
+    if (pendingViewQueue.size === 0) return;
+    const ids = Array.from(pendingViewQueue);
+    pendingViewQueue.clear();
+
+    if (typeof recordMessageBatchViewsFn === 'function') {
+      recordMessageBatchViewsFn(ids);
+    } else if (typeof recordMessageViewFn === 'function') {
+      ids.forEach(id => recordMessageViewFn(id));
+    }
+  }
+
+  function updateMessageViewsUI(msgId, viewsData) {
+    const count = (viewsData && typeof viewsData === 'object') ? Object.keys(viewsData).length : 0;
+
+    // Update in chat messages stream
+    if (chatMessagesContainer) {
+      const msgEl = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${msgId}"], .chat-msg[data-id="${msgId}"]`);
+      if (msgEl) {
+        let viewsBtn = msgEl.querySelector('.chat-views-btn');
+        if (!viewsBtn) {
+          const adminActions = msgEl.querySelector('.chat-admin-actions');
+          if (adminActions) {
+            viewsBtn = document.createElement('button');
+            viewsBtn.type = 'button';
+            viewsBtn.className = 'chat-admin-action-btn chat-views-btn';
+            viewsBtn.dataset.id = msgId;
+            viewsBtn.innerHTML = `
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <span class="chat-views-count">${count}</span>
+            `;
+            adminActions.prepend(viewsBtn);
+          }
+        }
+        if (viewsBtn) {
+          const countEl = viewsBtn.querySelector('.chat-views-count');
+          if (countEl) countEl.textContent = String(count);
+          viewsBtn.title = `Seen by ${count} passenger${count === 1 ? '' : 's'} (Click for details)`;
+          viewsBtn.setAttribute('aria-label', `${count} views`);
+        }
+      }
+    }
+
+    // Update in pinned banner if this is the pinned message
+    if (currentPinnedMessage && currentPinnedMessage.id === msgId) {
+      const pinnedCountEl = $('chat-pinned-views-count');
+      if (pinnedCountEl) pinnedCountEl.textContent = String(count);
+      const pinnedViewsBtn = $('chat-pinned-views-btn');
+      if (pinnedViewsBtn) {
+        pinnedViewsBtn.title = `Pinned message seen by ${count} passenger${count === 1 ? '' : 's'} (Click for details)`;
+      }
+    }
+  }
+
+  function renderViewsModalContent(msgId, senderName, msgText, viewsData) {
+    const authorEl = $('chat-views-quote-author');
+    const textEl = $('chat-views-quote-text');
+    const subtitleEl = $('chat-views-subtitle');
+    const totalBadge = $('chat-views-total-badge');
+    const listEl = $('chat-views-list');
+
+    if (authorEl) authorEl.textContent = senderName || 'Passenger';
+    if (textEl) textEl.textContent = msgText || '';
+
+    const entries = (viewsData && typeof viewsData === 'object') ? Object.entries(viewsData) : [];
+    entries.sort((a, b) => {
+      const tA = (a[1] && typeof a[1] === 'object' && a[1].t) ? Number(a[1].t) : 0;
+      const tB = (b[1] && typeof b[1] === 'object' && b[1].t) ? Number(b[1].t) : 0;
+      return tB - tA;
+    });
+
+    const count = entries.length;
+    if (subtitleEl) {
+      subtitleEl.textContent = count === 1 ? 'Seen by 1 passenger' : `Seen by ${count} passengers`;
+    }
+    if (totalBadge) {
+      totalBadge.textContent = count === 1 ? '1 view' : `${count} views`;
+    }
+
+    if (!listEl) return;
+    if (count === 0) {
+      listEl.innerHTML = `
+        <div class="chat-views-empty">
+          <span class="chat-views-empty-icon" aria-hidden="true">👁️</span>
+          <p class="chat-views-empty-title">No views recorded yet</p>
+          <p class="chat-views-empty-sub">When passengers view this message in chat, they will show up here live.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    entries.forEach(([sessId, item]) => {
+      const isMeViewer = sessId === mySessionId;
+      let name = 'Passenger';
+      let gender = 'M';
+      let isAdminViewer = false;
+      let timeFormatted = '';
+
+      if (item && typeof item === 'object') {
+        name = item.name || 'Passenger';
+        gender = item.gender === 'F' ? 'F' : 'M';
+        isAdminViewer = Boolean(item.isAdmin);
+        timeFormatted = item.t ? formatRelativeTime(item.t) : '';
+      } else {
+        timeFormatted = 'Viewed';
+      }
+
+      if (isMeViewer && isAdminVerified) {
+        name = 'You (Admin)';
+        isAdminViewer = true;
+      } else if (isMeViewer) {
+        name = `You (${name})`;
+      }
+
+      const color = isAdminViewer ? '#38bdf8' : getPassengerColor(name);
+      const initial = (name.replace(/[^a-zA-Z0-9]/g, '').charAt(0) || 'P').toUpperCase();
+      const genderTag = `<span class="chat-gender-tag gender-${gender.toLowerCase()}">${gender}</span>`;
+      const adminTag = isAdminViewer ? '<span class="chat-admin-pill-tag">OFFICIAL</span>' : '';
+
+      html += `
+        <div class="chat-viewer-row">
+          <div class="chat-viewer-avatar" style="background: ${color};">${escapeHtml(initial)}</div>
+          <div class="chat-viewer-col">
+            <div class="chat-viewer-name-wrap">
+              <span class="chat-viewer-name" style="color: ${color};">${escapeHtml(name)}</span>
+              ${genderTag}
+              ${adminTag}
+            </div>
+            <div class="chat-viewer-meta">
+              ${timeFormatted ? `<span class="chat-viewer-time">${escapeHtml(timeFormatted)}</span>` : ''}
+              <span class="chat-viewer-status">• Read receipt</span>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+  }
+
+  function showChatMessageViewsDetails(msgId) {
+    const modal = $('chat-views-modal');
+    if (!modal) return;
+    activeViewsModalMsgId = msgId;
+
+    const msgEl = chatMessagesContainer?.querySelector(`.chat-msg-row[data-id="${msgId}"], .chat-msg[data-id="${msgId}"]`);
+    let senderName = msgEl?.querySelector('.chat-sender-name')?.textContent || 'Passenger';
+    let msgText = msgEl?.querySelector('.chat-msg-text')?.textContent;
+    if (!msgText) {
+      msgText = msgEl?.querySelector('.chat-msg-media-wrap') ? '📷 Shared photo / media' : 'Message';
+    }
+
+    const currentViews = messageViewsData.get(msgId) || {};
+    renderViewsModalContent(msgId, senderName, msgText, currentViews);
+
+    modal.hidden = false;
+    modal.classList.remove('is-closing');
+
+    // Also query Firebase once to ensure freshest telemetry
+    if (typeof db !== 'undefined' && db && typeof get === 'function') {
+      try {
+        get(ref(db, `messages/${msgId}/views`)).then((snap) => {
+          const val = snap.val() || {};
+          messageViewsData.set(msgId, val);
+          updateMessageViewsUI(msgId, val);
+          if (activeViewsModalMsgId === msgId) {
+            renderViewsModalContent(msgId, senderName, msgText, val);
+          }
+        }).catch(() => {});
+      } catch (_) {}
+    }
+  }
+
+  function refreshActiveViewsModalContent() {
+    if (!activeViewsModalMsgId) return;
+    const modal = $('chat-views-modal');
+    if (!modal || modal.hidden) return;
+
+    const msgId = activeViewsModalMsgId;
+    const msgEl = chatMessagesContainer?.querySelector(`.chat-msg-row[data-id="${msgId}"], .chat-msg[data-id="${msgId}"]`);
+    let senderName = msgEl?.querySelector('.chat-sender-name')?.textContent || 'Passenger';
+    let msgText = msgEl?.querySelector('.chat-msg-text')?.textContent;
+    if (!msgText) {
+      msgText = msgEl?.querySelector('.chat-msg-media-wrap') ? '📷 Shared photo / media' : 'Message';
+    }
+
+    const currentViews = messageViewsData.get(msgId) || {};
+    renderViewsModalContent(msgId, senderName, msgText, currentViews);
+  }
+
+  function hideChatMessageViewsDetails() {
+    const modal = $('chat-views-modal');
+    if (!modal) return;
+    activeViewsModalMsgId = null;
+    modal.classList.add('is-closing');
+    setTimeout(() => {
+      modal.hidden = true;
+      modal.classList.remove('is-closing');
+    }, 180);
+  }
+
+  const chatViewsCloseBtn = $('chat-views-close-btn');
+  const chatViewsActionBtn = $('chat-views-action-btn');
+  const chatViewsBackdrop = $('chat-views-backdrop');
+  const chatPinnedViewsBtn = $('chat-pinned-views-btn');
+
+  if (chatViewsCloseBtn) chatViewsCloseBtn.addEventListener('click', hideChatMessageViewsDetails);
+  if (chatViewsActionBtn) chatViewsActionBtn.addEventListener('click', hideChatMessageViewsDetails);
+  if (chatViewsBackdrop) chatViewsBackdrop.addEventListener('click', hideChatMessageViewsDetails);
+  if (chatPinnedViewsBtn) {
+    chatPinnedViewsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!isAdminVerified) return;
+      if (currentPinnedMessage && currentPinnedMessage.id) {
+        showChatMessageViewsDetails(currentPinnedMessage.id);
+      }
+    });
   }
 
   // Initial local fallback for likes and pins
@@ -3491,6 +3801,14 @@ function initLiveSessionsAndChat() {
 
     const isPinned = Boolean(currentPinnedMessage && currentPinnedMessage.id === msgId);
 
+    const initialViews = (data.views && typeof data.views === 'object')
+      ? data.views
+      : ((typeof messageViewsData !== 'undefined' && messageViewsData.get(msgId)) || {});
+    const viewCount = Object.keys(initialViews).length;
+    if (typeof messageViewsData !== 'undefined') {
+      messageViewsData.set(msgId, initialViews);
+    }
+
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg-row ${isMe ? 'is-me' : ''} ${isVerified ? 'is-admin-msg' : ''} is-gender-${gender.toLowerCase()}`;
     msgEl.dataset.id = msgId;
@@ -3520,6 +3838,13 @@ function initLiveSessionsAndChat() {
             <span>Reply</span>
           </button>
           <div class="chat-admin-actions">
+            <button type="button" class="chat-admin-action-btn chat-views-btn" data-id="${escapeHtml(msgId)}" title="Seen by ${viewCount} passenger${viewCount === 1 ? '' : 's'} (Click for details)" aria-label="${viewCount} views">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <span class="chat-views-count">${viewCount}</span>
+            </button>
             <button type="button" class="chat-admin-action-btn chat-pin-btn ${isPinned ? 'is-pinned' : ''}" data-id="${escapeHtml(msgId)}" title="${isPinned ? 'Unpin message' : 'Pin message'}" aria-label="Pin message">
               <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/></svg>
             </button>
@@ -3537,6 +3862,13 @@ function initLiveSessionsAndChat() {
 
     chatMessagesContainer.appendChild(msgEl);
 
+    // Record view for this client
+    if (isMe || isChatOpen() || isLive) {
+      if (typeof queueMessageView === 'function') {
+        queueMessageView(msgId);
+      }
+    }
+
     // Enforce keeping only the last 30 unpinned messages in the chatbox
     const allMsgs = Array.from(chatMessagesContainer.querySelectorAll('.chat-msg-row, .chat-msg'));
     const prunableMsgs = allMsgs.filter(msg => !(currentPinnedMessage && msg.dataset.id === currentPinnedMessage.id));
@@ -3548,6 +3880,13 @@ function initLiveSessionsAndChat() {
           if (likeListenerUnsubs.has(oldMsg.dataset.id)) {
             try { likeListenerUnsubs.get(oldMsg.dataset.id)(); } catch (e) {}
             likeListenerUnsubs.delete(oldMsg.dataset.id);
+          }
+          if (typeof viewListenerUnsubs !== 'undefined' && viewListenerUnsubs.has(oldMsg.dataset.id)) {
+            try { viewListenerUnsubs.get(oldMsg.dataset.id)(); } catch (e) {}
+            viewListenerUnsubs.delete(oldMsg.dataset.id);
+          }
+          if (typeof messageViewsData !== 'undefined') {
+            messageViewsData.delete(oldMsg.dataset.id);
           }
         }
         oldMsg.remove();
@@ -3636,6 +3975,20 @@ function initLiveSessionsAndChat() {
           } else {
             notify('Original message is no longer in chat.');
           }
+        }
+        return;
+      }
+
+      // 4. Admin message views details
+      const viewsBtn = e.target.closest('.chat-views-btn');
+      if (viewsBtn) {
+        if (!isAdminVerified) {
+          notify('Admin authorization required.');
+          return;
+        }
+        const msgId = viewsBtn.getAttribute('data-id');
+        if (msgId && typeof showChatMessageViewsDetails === 'function') {
+          showChatMessageViewsDetails(msgId);
         }
         return;
       }
@@ -3734,7 +4087,7 @@ function initLiveSessionsAndChat() {
     Promise.all([
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),
       import('https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js')
-    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, remove, get, onDisconnect, serverTimestamp, query, limitToLast, onChildAdded, onChildRemoved }]) => {
+    ]).then(([{ initializeApp }, { getDatabase, ref, onValue, set, push, remove, get, onDisconnect, serverTimestamp, query, limitToLast, onChildAdded, onChildRemoved, update }]) => {
       const app = initializeApp(firebaseConfig);
       const db = getDatabase(app);
 
@@ -3820,6 +4173,18 @@ function initLiveSessionsAndChat() {
             updateMessageLikeUI(snapshot.key, count, hasLiked);
           });
           likeListenerUnsubs.set(snapshot.key, unsub);
+
+          // Real-time listener for views on this message
+          const msgViewsRef = ref(db, `messages/${snapshot.key}/views`);
+          const unsubViews = onValue(msgViewsRef, (viewsSnap) => {
+            const vVal = viewsSnap.val() || {};
+            messageViewsData.set(snapshot.key, vVal);
+            updateMessageViewsUI(snapshot.key, vVal);
+            if (activeViewsModalMsgId === snapshot.key) {
+              refreshActiveViewsModalContent();
+            }
+          });
+          viewListenerUnsubs.set(snapshot.key, unsubViews);
         }
       });
 
@@ -3836,6 +4201,11 @@ function initLiveSessionsAndChat() {
           try { likeListenerUnsubs.get(snapshot.key)(); } catch (e) {}
           likeListenerUnsubs.delete(snapshot.key);
         }
+        if (viewListenerUnsubs.has(snapshot.key)) {
+          try { viewListenerUnsubs.get(snapshot.key)(); } catch (e) {}
+          viewListenerUnsubs.delete(snapshot.key);
+        }
+        messageViewsData.delete(snapshot.key);
         if (!chatMessagesContainer) return;
         const msgEl = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${snapshot.key}"], .chat-msg[data-id="${snapshot.key}"]`);
         if (msgEl) {
@@ -3914,6 +4284,41 @@ function initLiveSessionsAndChat() {
         isInitialChatHistoryLoaded = true;
         autoPruneOldMessages();
       }, 1200);
+
+      recordMessageBatchViewsFn = (msgIds) => {
+        if (!Array.isArray(msgIds) || msgIds.length === 0 || !db) return;
+        const viewerName = (chatUsernameInput?.value.trim() || currentChatUsername || (isAdminVerified ? 'Admin' : 'Passenger')).slice(0, 24);
+        const viewerGender = currentChatGender || 'M';
+        const payload = {
+          t: Date.now(),
+          name: viewerName,
+          gender: viewerGender,
+          isAdmin: Boolean(isAdminVerified)
+        };
+        const updates = {};
+        msgIds.forEach((id) => {
+          if (id && id !== '_pinned') {
+            updates[`messages/${id}/views/${mySessionId}`] = payload;
+          }
+        });
+        if (Object.keys(updates).length > 0) {
+          update(ref(db), updates).catch(() => {
+            msgIds.forEach((id) => {
+              if (id && id !== '_pinned') {
+                set(ref(db, `messages/${id}/views/${mySessionId}`), payload).catch(() => {});
+              }
+            });
+          });
+        }
+      };
+
+      recordMessageViewFn = (msgId) => {
+        if (!msgId || msgId === '_pinned' || !db) return;
+        recordMessageBatchViewsFn([msgId]);
+      };
+
+      // Flush any message views queued during initialization
+      flushPendingViews();
 
       toggleLikeChatMessageFn = (msgId) => {
         const myLikeRef = ref(db, `messages/${msgId}/likes/${mySessionId}`);

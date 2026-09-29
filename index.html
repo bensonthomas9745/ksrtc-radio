@@ -69,7 +69,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles.css?v=62" />
+    <link rel="stylesheet" href="./src/styles.css?v=63" />
     <link rel="icon" type="image/png" href="./src/favicon.png" />
   </head>
   <body>
@@ -618,9 +618,18 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 </svg>
                 PINNED CHAT
               </span>
-              <button type="button" class="chat-unpin-btn" id="chat-unpin-btn" title="Unpin message" aria-label="Unpin message" hidden>
-                ✕ Unpin
-              </button>
+              <div class="chat-pinned-header-actions">
+                <button type="button" class="chat-pinned-views-btn" id="chat-pinned-views-btn" title="View details" aria-label="Pinned views" hidden>
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <span id="chat-pinned-views-count">0</span>
+                </button>
+                <button type="button" class="chat-unpin-btn" id="chat-unpin-btn" title="Unpin message" aria-label="Unpin message" hidden>
+                  ✕ Unpin
+                </button>
+              </div>
             </div>
             <div class="chat-pinned-body">
               <span class="chat-pinned-sender" id="chat-pinned-sender">Admin</span>
@@ -765,7 +774,50 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
     </div>
 
+    <!-- Apple-Style Admin Message Views Modal -->
+    <div id="chat-views-modal" class="chat-views-modal" hidden aria-modal="true" role="dialog" aria-labelledby="chat-views-title">
+      <div class="chat-views-backdrop" id="chat-views-backdrop"></div>
+      <div class="chat-views-card">
+        <button type="button" class="chat-views-close-btn" id="chat-views-close-btn" aria-label="Close dialog" title="Close">✕</button>
+        
+        <div class="chat-views-header">
+          <div class="chat-views-icon-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div class="chat-views-header-text">
+            <h3 id="chat-views-title" class="chat-views-title">Message Views</h3>
+            <p class="chat-views-subtitle" id="chat-views-subtitle">Seen by 0 passengers</p>
+          </div>
+        </div>
+
+        <div class="chat-views-quote" id="chat-views-quote">
+          <div class="chat-views-quote-bar"></div>
+          <div class="chat-views-quote-body">
+            <div class="chat-views-quote-author" id="chat-views-quote-author">Passenger</div>
+            <div class="chat-views-quote-text" id="chat-views-quote-text">Message</div>
+          </div>
+        </div>
+
+        <div class="chat-views-list-container">
+          <div class="chat-views-list-header">
+            <span>Passenger Activity</span>
+            <span class="chat-views-total-badge" id="chat-views-total-badge">0 views</span>
+          </div>
+          <div class="chat-views-list" id="chat-views-list">
+            <!-- Dynamically populated viewer rows -->
+          </div>
+        </div>
+
+        <div class="chat-views-actions">
+          <button type="button" class="chat-views-action-btn" id="chat-views-action-btn">Done</button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://www.youtube.com/iframe_api"></script>
-    <script type="module" src="./src/app.js?v=74"></script>
+    <script type="module" src="./src/app.js?v=75"></script>
   </body>
 </html>

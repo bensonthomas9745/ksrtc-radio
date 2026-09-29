@@ -2684,6 +2684,63 @@ button { color:inherit; cursor:pointer; }
   border-color: rgba(239, 68, 68, 0.5);
   color: #f87171;
 }
+.chat-admin-action-btn.chat-views-btn {
+  width: auto;
+  min-width: 30px;
+  height: 24px;
+  border-radius: 12px;
+  padding: 0 7px;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.28);
+  color: #38bdf8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.chat-admin-action-btn.chat-views-btn:hover {
+  background: rgba(56, 189, 248, 0.24);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #7dd3fc;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+  transform: scale(1.05);
+}
+.chat-admin-action-btn.chat-views-btn svg {
+  flex-shrink: 0;
+}
+.chat-views-count {
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.chat-pinned-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-pinned-views-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.chat-pinned-views-btn:hover {
+  background: rgba(56, 189, 248, 0.28);
+  border-color: rgba(56, 189, 248, 0.65);
+  color: #7dd3fc;
+}
 
 /* Apple-Style Reply Preview Bar */
 .chat-reply-bar {
@@ -4310,4 +4367,312 @@ button.drawer-whats-new-link {
 .global-add-btn.cancel:hover {
   background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
+}
+
+/* ==========================================================================
+   Apple-Style Admin Message Views Modal
+   ========================================================================== */
+.chat-views-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.chat-views-modal[hidden] {
+  display: none !important;
+}
+
+.chat-views-modal.is-closing {
+  animation: appleFadeOut 0.18s ease forwards;
+}
+
+.chat-views-modal.is-closing .chat-views-card {
+  animation: appleScaleDown 0.18s ease forwards;
+}
+
+.chat-views-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  animation: appleFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.chat-views-card {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(24, 27, 34, 0.88);
+  backdrop-filter: blur(35px) saturate(190%);
+  -webkit-backdrop-filter: blur(35px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  border-radius: 22px;
+  color: #ffffff;
+  overflow: hidden;
+  animation: appleScaleUp 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.chat-views-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.65);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 3;
+}
+
+.chat-views-close-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.chat-views-header {
+  padding: 18px 20px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chat-views-icon-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.chat-views-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-views-title {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.chat-views-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.chat-views-quote {
+  margin: 12px 18px 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.chat-views-quote-bar {
+  width: 3px;
+  border-radius: 3px;
+  background: #38bdf8;
+  flex-shrink: 0;
+}
+
+.chat-views-quote-body {
+  overflow: hidden;
+  flex: 1;
+}
+
+.chat-views-quote-author {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #38bdf8;
+  margin-bottom: 2px;
+}
+
+.chat-views-quote-text {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-views-list-container {
+  padding: 8px 18px 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-views-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+
+.chat-views-total-badge {
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chat-views-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chat-views-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chat-views-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+
+.chat-viewer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  transition: background 0.15s ease;
+}
+
+.chat-viewer-row:hover {
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.chat-viewer-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0b0f19;
+  flex-shrink: 0;
+}
+
+.chat-viewer-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-viewer-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.chat-viewer-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-viewer-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+  margin-top: 2px;
+}
+
+.chat-views-empty {
+  text-align: center;
+  padding: 28px 12px;
+}
+
+.chat-views-empty-icon {
+  font-size: 30px;
+  display: block;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+.chat-views-empty-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.chat-views-empty-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.4;
+}
+
+.chat-views-actions {
+  padding: 12px 18px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chat-views-action-btn {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  background: #0a84ff;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-views-action-btn:hover {
+  background: #0071e3;
+  transform: scale(0.99);
 }
