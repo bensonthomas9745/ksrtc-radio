@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Draw & Guess Multiplayer • KSRTC Radio</title>
+    <meta name="description" content="Play Draw & Guess real-time multiplayer with your friends and fellow KSRTC Radio passengers! 4-20 players, secret words, live drawings, and lightning-fast guesses." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./src/draw-game.css?v=2" />
+    <link rel="icon" type="image/png" href="./src/favicon.png" />
+  </head>
+  <body>
+    <div class="game-bg-art" aria-hidden="true"></div>
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="game-app" id="game-app">
+      <!-- Top Navigation & Status Header -->
+      <header class="game-header">
+        <a href="/" class="brand-section" title="Return to KSRTC Radio">
+          <div class="brand-icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="#f5c871">
+              <path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm-9.5-6V6h14v5H7z"/>
+            </svg>
+          </div>
+          <div class="brand-meta">
+            <span class="brand-title">DRAW & <span class="highlight">GUESS</span></span>
+            <span class="brand-subtitle">KSRTC Radio Passenger Game</span>
+          </div>
+        </a>
+
+        <!-- Center In-Game Status -->
+        <div class="header-center-info" id="header-status-wrap" hidden>
+          <div class="room-badge" id="header-room-badge" title="Click to copy invite link">
+            <span>Room:</span>
+            <span class="code-text" id="header-room-code">-----</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </div>
+
+          <div class="round-pill" id="header-round-pill">
+            Round <span id="header-round-num">1</span>/<span id="header-total-rounds">10</span>
+          </div>
+
+          <div class="timer-pill" id="header-timer-pill">
+            <span>⏱️</span>
+            <span id="header-timer-val">45</span>s
+          </div>
+        </div>
+
+        <!-- Right Action Controls -->
+        <div class="header-right-actions">
+          <button type="button" class="header-action-btn icon-only" id="sound-toggle-btn" aria-label="Toggle game sounds" title="Sound Effects">
+            <span id="sound-icon">🔊</span>
+          </button>
+          <a href="/" class="header-action-btn" title="Exit to Radio Player">
+            <span>📻 Radio</span>
+          </a>
+        </div>
+      </header>
+
+      <!-- Main Game Viewport -->
+      <main class="view-container">
+        <!-- 1. LOBBY VIEW (Join / Create / Room Lobby) -->
+        <section class="lobby-screen" id="lobby-section">
+          <!-- Auth / Setup Card (shown before entering a room) -->
+          <div class="lobby-card" id="lobby-setup-card">
+            <div class="lobby-header">
+              <span class="lobby-header-icon" aria-hidden="true">🎨</span>
+              <h1 class="lobby-title">Draw &amp; <span class="glow">Guess</span></h1>
+              <p class="lobby-desc">Real-time multiplayer sketching for 4–20 friends &amp; travelers</p>
+            </div>
+
+            <div class="lobby-tabs" role="tablist">
+              <button type="button" class="lobby-tab-btn is-active" id="tab-btn-create" role="tab">Create Room</button>
+              <button type="button" class="lobby-tab-btn" id="tab-btn-join" role="tab">Join Room</button>
+            </div>
+
+            <!-- Profile Info: Display Name & Avatar -->
+            <div class="form-group">
+              <label class="form-label" for="player-name-input">Your Display Name</label>
+              <input type="text" id="player-name-input" class="form-input" placeholder="e.g. Anandhu, Sandra, Benson" maxlength="18" autocomplete="name" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Pick Your Avatar</label>
+              <div class="avatar-selector" id="avatar-selector" role="radiogroup" aria-label="Pick avatar emoji">
+                <button type="button" class="avatar-pill is-selected" data-avatar="🎨">🎨</button>
+                <button type="button" class="avatar-pill" data-avatar="🚍">🚍</button>
+                <button type="button" class="avatar-pill" data-avatar="🦁">🦁</button>
+                <button type="button" class="avatar-pill" data-avatar="⚡">⚡</button>
+                <button type="button" class="avatar-pill" data-avatar="🌟">🌟</button>
+                <button type="button" class="avatar-pill" data-avatar="🍕">🍕</button>
+                <button type="button" class="avatar-pill" data-avatar="🚀">🚀</button>
+                <button type="button" class="avatar-pill" data-avatar="👑">👑</button>
+                <button type="button" class="avatar-pill" data-avatar="🎭">🎭</button>
+                <button type="button" class="avatar-pill" data-avatar="☕">☕</button>
+              </div>
+            </div>
+
+            <!-- Create Room Action Form -->
+            <div id="create-room-panel">
+              <button type="button" class="btn-primary" id="btn-create-room">
+                <span>✨ Create Game Room</span>
+              </button>
+            </div>
+
+            <!-- Join Room Action Form -->
+            <div id="join-room-panel" hidden>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label" for="room-code-input">5-Character Room Code</label>
+                <input type="text" id="room-code-input" class="form-input code-input" placeholder="K7X92" maxlength="6" autocomplete="off" />
+              </div>
+              <button type="button" class="btn-primary" id="btn-join-room">
+                <span>🚀 Join Room</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Room Lobby Card (shown once room is created / joined) -->
+          <div class="lobby-card" id="room-lobby-card" hidden>
+            <div class="room-lobby-view">
+              <div class="room-code-banner">
+                <span class="room-code-banner-title">Invite Room Code</span>
+                <span class="room-code-banner-code" id="lobby-code-display">K7X92</span>
+                <div class="room-share-actions">
+                  <button type="button" class="btn-secondary" id="btn-copy-room-link">
+                    📋 Copy Invite Link
+                  </button>
+                  <button type="button" class="btn-secondary" id="btn-share-whatsapp">
+                    💬 WhatsApp
+                  </button>
+                </div>
+              </div>
+
+              <div class="players-list-card">
+                <div class="players-list-header">
+                  <span class="players-count-label" id="lobby-players-count">
+                    👥 1/20 Players
+                  </span>
+                  <span class="players-status-hint" id="lobby-status-hint">
+                    Min 3 players to start
+                  </span>
+                </div>
+                <div class="players-grid" id="lobby-players-grid">
+                  <!-- Dynamic players chips -->
+                </div>
+              </div>
+
+              <div class="lobby-action-buttons">
+                <button type="button" class="btn-primary" id="btn-start-game" disabled>
+                  <span>🎮 START GAME</span>
+                </button>
+                <p id="host-start-hint" style="font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 8px;">
+                  Waiting for host to start the game...
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. IN-GAME PLAY VIEW (Canvas, Tools, Live Guess Chat) -->
+        <section class="play-view" id="game-play-section" hidden>
+          <!-- Left Column: Top prompt + Canvas + Drawing tools -->
+          <div class="game-main-area">
+            <!-- Word Prompt Top Banner -->
+            <div class="word-prompt-bar" id="word-prompt-bar">
+              <div class="prompt-drawer-info">
+                <span class="prompt-role-badge" id="prompt-role-badge">🎨 ARTIST</span>
+                <div class="prompt-word-reveal" id="prompt-word-reveal">
+                  <!-- Dynamic word or blanks -->
+                  <span class="actual-word" id="prompt-word-text">ELEPHANT</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="prompt-category-tag" id="prompt-category-tag">Animals</span>
+                <span class="prompt-hint-box" id="prompt-hint-box" hidden>
+                  💡 <span id="prompt-hint-text">Hint</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Drawing Canvas Wrapper -->
+            <div class="canvas-wrapper" id="canvas-wrapper">
+              <canvas id="drawing-canvas" class="drawing-canvas" width="800" height="600"></canvas>
+
+              <!-- Floating Drawer Toolbar (Drawer Only) -->
+              <div class="drawing-toolbar" id="drawing-toolbar">
+                <!-- Color Palette -->
+                <div class="color-palette" id="color-palette">
+                  <button type="button" class="color-swatch is-active" data-color="#000000" style="background:#000000;" title="Black"></button>
+                  <button type="button" class="color-swatch" data-color="#64748b" style="background:#64748b;" title="Slate Gray"></button>
+                  <button type="button" class="color-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                  <button type="button" class="color-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                  <button type="button" class="color-swatch" data-color="#facc15" style="background:#facc15;" title="Yellow"></button>
+                  <button type="button" class="color-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                  <button type="button" class="color-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                  <button type="button" class="color-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                  <button type="button" class="color-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                  <button type="button" class="color-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                  <button type="button" class="color-swatch" data-color="#78350f" style="background:#78350f;" title="Brown"></button>
+                  <button type="button" class="color-swatch" data-color="#ffffff" style="background:#ffffff;" title="White"></button>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <!-- Brush Sizes -->
+                <div class="size-selector" id="size-selector">
+                  <button type="button" class="size-btn" data-size="3" title="Fine (3px)">
+                    <span class="size-dot" style="width:4px; height:4px;"></span>
+                  </button>
+                  <button type="button" class="size-btn is-active" data-size="6" title="Medium (6px)">
+                    <span class="size-dot" style="width:8px; height:8px;"></span>
+                  </button>
+                  <button type="button" class="size-btn" data-size="12" title="Thick (12px)">
+                    <span class="size-dot" style="width:12px; height:12px;"></span>
+                  </button>
+                  <button type="button" class="size-btn" data-size="22" title="Extra Broad (22px)">
+                    <span class="size-dot" style="width:16px; height:16px;"></span>
+                  </button>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <!-- Action Tools -->
+                <div class="action-tools">
+                  <button type="button" class="tool-btn is-active" id="tool-brush" title="Pen Brush">🖌️</button>
+                  <button type="button" class="tool-btn" id="tool-eraser" title="Eraser">🧹</button>
+                  <button type="button" class="tool-btn" id="tool-undo" title="Undo Stroke">↩️</button>
+                  <button type="button" class="tool-btn" id="tool-clear" title="Clear Canvas">🗑️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Scores & Guess Feed -->
+          <aside class="game-side-panel">
+            <!-- Scoreboard -->
+            <div class="side-scoreboard-wrap">
+              <div class="side-scoreboard-title">
+                <span>Leaderboard</span>
+                <span id="side-player-count">3 players</span>
+              </div>
+              <div class="side-players-list" id="side-players-list">
+                <!-- Dynamic Player Rows -->
+              </div>
+            </div>
+
+            <!-- Feed -->
+            <div class="game-feed-area">
+              <div class="feed-messages" id="feed-messages" role="log" aria-live="polite">
+                <div class="feed-msg system">
+                  🚍 Welcome aboard Draw &amp; Guess! Enter guesses below.
+                </div>
+              </div>
+
+              <!-- Input bar -->
+              <div class="game-input-bar">
+                <form class="game-input-form" id="guess-form" autocomplete="off">
+                  <input type="text" id="guess-input" class="guess-input" placeholder="Type your guess here…" maxlength="40" autocomplete="off" />
+                  <button type="submit" class="guess-send-btn" id="guess-submit-btn">Send</button>
+                </form>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <!-- 3. ROUND END SUMMARY MODAL (Authoritative 5s view) -->
+        <div class="modal-overlay" id="round-end-overlay" hidden>
+          <div class="round-summary-card">
+            <span style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--blue); font-weight: 700;">
+              Round <span id="round-summary-num">1</span> Finished!
+            </span>
+            <div class="word-tag" id="round-summary-word">ELEPHANT</div>
+            <div class="drawer-note" id="round-summary-drawer-note">
+              Artist <strong id="summary-drawer-name">Benson</strong> earned <span id="summary-drawer-pts">+75</span> points!
+            </div>
+
+            <div class="round-guessers-list" id="round-summary-guessers">
+              <!-- Guesser results list -->
+            </div>
+
+            <div class="round-countdown-bar" id="round-next-countdown">
+              Next round starts in 5 seconds…
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. FINAL GAME OVER PODIUM MODAL -->
+        <div class="modal-overlay" id="game-over-overlay" hidden>
+          <div class="gameover-card">
+            <span style="font-size: 38px;" aria-hidden="true">🏆</span>
+            <h2 style="font-size: 26px; font-weight: 800; color: var(--gold); letter-spacing: -0.5px;">
+              Game Over!
+            </h2>
+
+            <!-- 1st, 2nd, 3rd Podium -->
+            <div class="podium-container" id="podium-container">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- Fun Awards -->
+            <div class="awards-grid" id="awards-grid">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- Actions -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+              <button type="button" class="btn-primary" id="btn-play-again">
+                <span>🔄 Play Again (Same Room)</span>
+              </button>
+              <button type="button" class="btn-secondary" id="btn-share-results">
+                <span>📋 Share Game Results</span>
+              </button>
+              <button type="button" class="btn-secondary" id="btn-new-room">
+                <span>➕ Leave / New Room</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="./src/draw-game.js"></script>
+  </body>
+</html>

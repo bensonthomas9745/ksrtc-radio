@@ -548,6 +548,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               </div>
             </div>
             <div class="chat-header-right-actions">
+              <a href="/draw" target="_blank" class="chat-header-circle-btn chat-draw-game-btn" id="chat-draw-game-btn" aria-label="Play Draw & Guess Multiplayer" title="Play Draw & Guess (Multiplayer)" style="text-decoration:none;">
+                <span aria-hidden="true" style="font-size: 15px;">🎨</span>
+              </a>
               <button type="button" class="chat-header-circle-btn chat-mute-btn" id="chat-mute-btn" aria-label="Mute notification sound" title="Mute notification sound">
                 <svg class="chat-mute-icon-on" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
@@ -564,6 +567,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               <button type="button" class="chat-header-circle-btn playlist-close-btn" id="chat-close-btn" aria-label="Close chat" title="Close chat">✕</button>
 
               <div class="chat-options-menu" id="chat-options-menu" hidden role="menu" aria-label="Chat options menu">
+                <a href="/draw" target="_blank" class="chat-options-item" id="chat-options-draw-game" role="menuitem" style="text-decoration:none; color:inherit;">
+                  <span class="chat-options-icon" aria-hidden="true">🎨</span>
+                  <span class="chat-options-label">Play Draw &amp; Guess</span>
+                </a>
                 <button type="button" class="chat-options-item" id="chat-options-toggle-sound" role="menuitem">
                   <span class="chat-options-icon" id="chat-options-sound-icon" aria-hidden="true">🔔</span>
                   <span class="chat-options-label" id="chat-options-sound-label">Mute notification sound</span>
@@ -756,6 +763,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
             <!-- Apple-Style Quick Reaction Chips -->
             <div class="chat-quick-chips" id="chat-quick-chips" role="toolbar" aria-label="Quick passenger messages">
+              <a href="/draw" target="_blank" class="chat-chip chat-chip-game" id="chat-chip-draw-game" style="text-decoration:none; background:rgba(245,200,113,0.18); border-color:rgba(245,200,113,0.45); color:#fde68a; font-weight:600;">🎨 Draw &amp; Guess</a>
               <button type="button" class="chat-chip" data-text="👋 Hello!">👋 Hello!</button>
               <button type="button" class="chat-chip" data-text="🎵 Great song!">🎵 Great song!</button>
               <button type="button" class="chat-chip" data-text="🚌 On my way!">🚌 On my way!</button>

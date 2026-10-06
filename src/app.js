@@ -4921,6 +4921,14 @@ if (chatOptionsToggleSound) {
   });
 }
 
+const chatOptionsDrawGame = $('chat-options-draw-game');
+if (chatOptionsDrawGame) {
+  chatOptionsDrawGame.addEventListener('click', () => {
+    if (chatOptionsMenu) chatOptionsMenu.hidden = true;
+    if (chatOptionsBtn) chatOptionsBtn.setAttribute('aria-expanded', 'false');
+  });
+}
+
 if (chatOptionsViewRules) {
   chatOptionsViewRules.addEventListener('click', (e) => {
     e.stopPropagation();
