@@ -132,6 +132,11 @@ function isMyMessage(data, msgId) {
   if (msgId && getMySentMessageIds().has(msgId)) return true;
   return false;
 }
+function isMyViewEntry(sessId, item) {
+  if (sessId === mySessionId) return true;
+  if (item && typeof item === 'object' && item.deviceId && item.deviceId === myDeviceId) return true;
+  return false;
+}
 
 // In-app browser detection (Instagram, Facebook, etc.)
 const isInstagramOrInApp = /(Instagram|FBAN|FBAV|Snapchat|TikTok|Line|Threads)/i.test(navigator.userAgent || '') || window.location.search.includes('inapp');
@@ -2512,9 +2517,12 @@ function updateAdminUI() {
   if (typeof renderPlaylist === 'function') {
     renderPlaylist(currentSearchFilter || '');
   }
-  if (chatMessagesContainer && typeof messageViewsData !== 'undefined') {
-    messageViewsData.forEach((vVal, mId) => {
-      if (typeof updateMessageViewsUI === 'function') {
+  if (chatMessagesContainer) {
+    const allMsgRows = chatMessagesContainer.querySelectorAll('.chat-msg-row[data-id], .chat-msg[data-id]');
+    allMsgRows.forEach((row) => {
+      const mId = row.dataset.id;
+      if (mId && typeof updateMessageViewsUI === 'function') {
+        const vVal = (typeof messageViewsData !== 'undefined' && messageViewsData.get(mId)) || {};
         updateMessageViewsUI(mId, vVal);
       }
     });
@@ -3460,7 +3468,8 @@ function initLiveSessionsAndChat() {
   function queueMessageView(msgId) {
     if (!msgId || msgId === '_pinned' || hasLocalViewRecorded(msgId)) return;
     // Don't record view on our own sent messages
-    if (getMySentMessageIds().has(msgId)) {
+    const msgEl = chatMessagesContainer?.querySelector(`.chat-msg-row[data-id="${msgId}"], .chat-msg[data-id="${msgId}"]`);
+    if (getMySentMessageIds().has(msgId) || (msgEl && msgEl.classList.contains('is-me'))) {
       recordedViewMsgIds.add(msgId);
       return;
     }
@@ -3492,7 +3501,7 @@ function initLiveSessionsAndChat() {
     if (!viewsData || typeof viewsData !== 'object') viewsData = {};
     const entries = Object.entries(viewsData);
     // For non-admin author, count only other passengers who viewed their message
-    const count = isAdminVerified ? entries.length : entries.filter(([sId]) => sId !== mySessionId).length;
+    const count = isAdminVerified ? entries.length : entries.filter(([sId, item]) => !isMyViewEntry(sId, item)).length;
 
     // Update in chat messages stream
     if (chatMessagesContainer) {
@@ -3557,7 +3566,7 @@ function initLiveSessionsAndChat() {
     if (textEl) textEl.textContent = msgText || '';
 
     const entries = (viewsData && typeof viewsData === 'object') ? Object.entries(viewsData) : [];
-    const validEntries = isAdminVerified ? entries : entries.filter(([sessId]) => sessId !== mySessionId);
+    const validEntries = isAdminVerified ? entries : entries.filter(([sessId, item]) => !isMyViewEntry(sessId, item));
     validEntries.sort((a, b) => {
       const tA = (a[1] && typeof a[1] === 'object' && a[1].t) ? Number(a[1].t) : 0;
       const tB = (b[1] && typeof b[1] === 'object' && b[1].t) ? Number(b[1].t) : 0;
@@ -3881,7 +3890,7 @@ function initLiveSessionsAndChat() {
       ? data.views
       : ((typeof messageViewsData !== 'undefined' && messageViewsData.get(msgId)) || {});
     const initialEntries = Object.entries(initialViews);
-    const viewCount = isAdminVerified ? initialEntries.length : initialEntries.filter(([sId]) => sId !== mySessionId).length;
+    const viewCount = isAdminVerified ? initialEntries.length : initialEntries.filter(([sId, item]) => !isMyViewEntry(sId, item)).length;
     if (typeof messageViewsData !== 'undefined') {
       messageViewsData.set(msgId, initialViews);
     }
@@ -4374,7 +4383,8 @@ function initLiveSessionsAndChat() {
           t: Date.now(),
           name: viewerName,
           gender: viewerGender,
-          isAdmin: Boolean(isAdminVerified)
+          isAdmin: Boolean(isAdminVerified),
+          deviceId: myDeviceId
         };
         const updates = {};
         msgIds.forEach((id) => {
