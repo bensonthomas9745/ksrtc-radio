@@ -382,7 +382,7 @@ function setBgMode(mode, persist = true) {
     app.classList.toggle('is-photo-bg', isPhoto);
   }
 
-  document.querySelectorAll('.bg-mode-btn, .popover-bg-btn').forEach((btn) => {
+  document.querySelectorAll('.bg-mode-icon-btn, .bg-mode-btn, .popover-bg-btn').forEach((btn) => {
     const btnMode = btn.dataset.mode;
     const isActive = btnMode === currentBgMode;
     btn.classList.toggle('is-active', isActive);
@@ -406,7 +406,7 @@ function setBgMode(mode, persist = true) {
 }
 
 document.addEventListener('click', (e) => {
-  const bgBtn = e.target.closest('.bg-mode-btn, .popover-bg-btn');
+  const bgBtn = e.target.closest('.bg-mode-icon-btn, .bg-mode-btn, .popover-bg-btn');
   if (bgBtn) {
     e.stopPropagation();
     const mode = bgBtn.dataset.mode;
