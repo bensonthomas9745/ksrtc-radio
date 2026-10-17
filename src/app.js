@@ -359,6 +359,66 @@ function setSongVolume(vol, persist = true) {
 
 updateSongVolumeUI();
 
+// Scene Background Mode: 'video' (default) or 'photo'
+const BG_MODE_KEY = 'ksrtc_scene_bg_mode_v1';
+let currentBgMode = (() => {
+  try {
+    return localStorage.getItem(BG_MODE_KEY) || 'video';
+  } catch (e) {
+    return 'video';
+  }
+})();
+
+function setBgMode(mode, persist = true) {
+  currentBgMode = mode === 'photo' ? 'photo' : 'video';
+  if (persist) {
+    try {
+      localStorage.setItem(BG_MODE_KEY, currentBgMode);
+    } catch (e) {}
+  }
+
+  const isPhoto = currentBgMode === 'photo';
+  if (app) {
+    app.classList.toggle('is-photo-bg', isPhoto);
+  }
+
+  document.querySelectorAll('.bg-mode-btn, .popover-bg-btn').forEach((btn) => {
+    const btnMode = btn.dataset.mode;
+    const isActive = btnMode === currentBgMode;
+    btn.classList.toggle('is-active', isActive);
+    btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+
+  if (isPhoto) {
+    try { if (journey) journey.pause(); } catch (e) {}
+    try { if (rainVideo) rainVideo.pause(); } catch (e) {}
+  } else {
+    if (app && !app.classList.contains('intro-active')) {
+      if (state && !state.isStopping) {
+        const vidToPlay = state.isRainMode ? rainVideo : journey;
+        if (vidToPlay) {
+          vidToPlay.classList.add('is-visible');
+          playSafe(vidToPlay);
+        }
+      }
+    }
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const bgBtn = e.target.closest('.bg-mode-btn, .popover-bg-btn');
+  if (bgBtn) {
+    e.stopPropagation();
+    const mode = bgBtn.dataset.mode;
+    if (mode) {
+      setBgMode(mode, true);
+      notify(mode === 'photo' ? 'Photo background enabled.' : 'Video background enabled.');
+    }
+  }
+});
+
+setBgMode(currentBgMode, false);
+
 // Rain sound state & user volume preference (default: 80%)
 const savedRainVolume = (() => {
   try { return localStorage.getItem('ksrtc_rain_sound_volume_v2'); } catch (e) { return null; }
@@ -832,7 +892,9 @@ function toggleRain() {
       journey.classList.remove('is-visible');
       rainVideo.currentTime = 0;
       rainVideo.classList.add('is-visible');
-      playSafe(rainVideo);
+      if (currentBgMode === 'photo') {
+        try { rainVideo.pause(); } catch (e) {}
+      }
       state.currentVideo = 'rain';
       rainAudio.volume = currentRainVolume / 100;
       rainAudio.currentTime = 0;
@@ -851,8 +913,10 @@ function toggleRain() {
     rainAudio.currentTime = 0;
     rainVideo.pause();
     rainVideo.classList.remove('is-visible');
-    journey.classList.add('is-visible');
-    playSafe(journey);
+    if (currentBgMode !== 'photo') {
+      journey.classList.add('is-visible');
+      playSafe(journey);
+    }
     state.currentVideo = 'journey';
     notify('Rain off.');
   }
@@ -1046,8 +1110,12 @@ const finishLoading = () => {
     loadingStatus.textContent = 'All aboard! Welcome aboard KSRTC Radio…';
   }
 
-  journey.classList.add('is-visible');
-  playSafe(journey);
+  if (currentBgMode !== 'photo') {
+    journey.classList.add('is-visible');
+    playSafe(journey);
+  } else {
+    journey.classList.remove('is-visible');
+  }
 
   els.intro.classList.remove('is-starting');
   els.intro.classList.add('is-unblurring');
@@ -1364,8 +1432,10 @@ function onStopEnded() {
       stopVideo.muted = true;
     } catch (e) {}
     stopVideo.classList.remove('is-visible');
-    journey.classList.add('is-visible');
-    playSafe(journey);
+    if (currentBgMode !== 'photo') {
+      journey.classList.add('is-visible');
+      playSafe(journey);
+    }
     state.currentVideo = 'journey';
     syncRunAudio();
     notify('Journey resumed.');
