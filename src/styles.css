@@ -2639,6 +2639,26 @@ button { color:inherit; cursor:pointer; }
   font-size: 11.5px;
   font-weight: 600;
 }
+.chat-pill-btn.chat-views-btn {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.22);
+  color: #38bdf8;
+  gap: 4.5px;
+}
+.chat-pill-btn.chat-views-btn:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #7dd3fc;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.22);
+  transform: translateY(-0.5px);
+}
+.chat-pill-btn.chat-views-btn:active {
+  transform: scale(0.95);
+}
+.chat-pill-btn.chat-views-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
 .chat-admin-actions {
   display: none;
   align-items: center;

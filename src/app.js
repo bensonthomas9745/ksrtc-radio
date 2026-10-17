@@ -77,7 +77,22 @@ const journey = $('journey-video'), rainVideo = $('rain-video'), stopVideo = $('
 const loadingBar = $('loading-bar'), loadingStatus = $('loading-status');
 const els = { intro:$('intro'), player:$('player'), start:$('start-journey'), replay:$('replay'), fullscreenBtn:$('fullscreen-btn'), playlistToggle:$('playlist-toggle'), album:$('album-art'), title:$('track-title'), artist:$('track-artist'), progress:$('progress'), current:$('current-time'), duration:$('duration'), play:$('play'), previous:$('previous'), next:$('next'), stop:$('make-stop'), rain:$('rain'), horn:$('horn'), bell:$('bell'), toast:$('toast'), brand:document.querySelector('.brand'), boardNow:$('board-now-btn'), busSoundToggle:$('bus-sound-toggle'), busSoundSlider:$('bus-sound-slider'), busSoundValue:$('bus-sound-value'), busSoundLabel:$('bus-sound-label'), rainSoundBar:$('rain-sound-bar'), rainSoundToggle:$('rain-sound-toggle'), rainSoundSlider:$('rain-sound-slider'), rainSoundValue:$('rain-sound-value'), rainSoundLabel:$('rain-sound-label') };
 
-// Persistent tab session ID for live presence and chat
+// Persistent device ID for identifying device across tabs
+const DEVICE_STORAGE_KEY = 'ksrtc_device_id_v1';
+const myDeviceId = (() => {
+  try {
+    let id = localStorage.getItem(DEVICE_STORAGE_KEY);
+    if (!id) {
+      id = 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+      localStorage.setItem(DEVICE_STORAGE_KEY, id);
+    }
+    return id;
+  } catch (e) {
+    return 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+  }
+})();
+
+// Persistent tab session ID for live presence and chat (counts each open tab session)
 const mySessionId = (() => {
   try {
     let id = sessionStorage.getItem('ksrtc_session_id_v1');
@@ -90,6 +105,33 @@ const mySessionId = (() => {
     return 's_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
   }
 })();
+
+const MY_SENT_MESSAGES_KEY = 'ksrtc_my_sent_messages_v1';
+function getMySentMessageIds() {
+  try {
+    const raw = localStorage.getItem(MY_SENT_MESSAGES_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch (e) {
+    return new Set();
+  }
+}
+function recordMySentMessageId(id) {
+  if (!id) return;
+  try {
+    const set = getMySentMessageIds();
+    set.add(id);
+    const arr = Array.from(set).slice(-300);
+    localStorage.setItem(MY_SENT_MESSAGES_KEY, JSON.stringify(arr));
+  } catch (e) {}
+}
+function isMyMessage(data, msgId) {
+  if (!data && !msgId) return false;
+  if (data) {
+    if (data.session === mySessionId || (data.deviceId && data.deviceId === myDeviceId)) return true;
+  }
+  if (msgId && getMySentMessageIds().has(msgId)) return true;
+  return false;
+}
 
 // In-app browser detection (Instagram, Facebook, etc.)
 const isInstagramOrInApp = /(Instagram|FBAN|FBAV|Snapchat|TikTok|Line|Threads)/i.test(navigator.userAgent || '') || window.location.search.includes('inapp');
@@ -2470,7 +2512,7 @@ function updateAdminUI() {
   if (typeof renderPlaylist === 'function') {
     renderPlaylist(currentSearchFilter || '');
   }
-  if (chatMessagesContainer && isAdminVerified && typeof messageViewsData !== 'undefined') {
+  if (chatMessagesContainer && typeof messageViewsData !== 'undefined') {
     messageViewsData.forEach((vVal, mId) => {
       if (typeof updateMessageViewsUI === 'function') {
         updateMessageViewsUI(mId, vVal);
@@ -2605,7 +2647,7 @@ function getRecentChatItemFromData(msgId, data) {
   const snippet = text || (data.imageUrl ? '📷 Shared a photo' : (data.gifUrl ? '🎞️ Shared a GIF' : ''));
   if (!snippet) return null;
 
-  const isMe = data.session === mySessionId;
+  const isMe = isMyMessage(data, msgId);
   const isVerified = Boolean(
     (data.isAdmin === true && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH)) ||
     (senderName.toLowerCase() === 'admin' && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH || data.isAdmin === true)) ||
@@ -3395,6 +3437,15 @@ function initLiveSessionsAndChat() {
     return `${diffDay}d ago`;
   }
 
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('ksrtc_viewed_')) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch (_) {}
+
   function hasLocalViewRecorded(msgId) {
     if (recordedViewMsgIds.has(msgId)) return true;
     try {
@@ -3408,6 +3459,11 @@ function initLiveSessionsAndChat() {
 
   function queueMessageView(msgId) {
     if (!msgId || msgId === '_pinned' || hasLocalViewRecorded(msgId)) return;
+    // Don't record view on our own sent messages
+    if (getMySentMessageIds().has(msgId)) {
+      recordedViewMsgIds.add(msgId);
+      return;
+    }
     recordedViewMsgIds.add(msgId);
     try {
       sessionStorage.setItem(`ksrtc_viewed_${msgId}`, '1');
@@ -3433,19 +3489,23 @@ function initLiveSessionsAndChat() {
   }
 
   function updateMessageViewsUI(msgId, viewsData) {
-    const count = (viewsData && typeof viewsData === 'object') ? Object.keys(viewsData).length : 0;
+    if (!viewsData || typeof viewsData !== 'object') viewsData = {};
+    const entries = Object.entries(viewsData);
+    // For non-admin author, count only other passengers who viewed their message
+    const count = isAdminVerified ? entries.length : entries.filter(([sId]) => sId !== mySessionId).length;
 
     // Update in chat messages stream
     if (chatMessagesContainer) {
       const msgEl = chatMessagesContainer.querySelector(`.chat-msg-row[data-id="${msgId}"], .chat-msg[data-id="${msgId}"]`);
       if (msgEl) {
+        const isMsgMine = msgEl.classList.contains('is-me') || getMySentMessageIds().has(msgId);
         let viewsBtn = msgEl.querySelector('.chat-views-btn');
-        if (!viewsBtn) {
-          const adminActions = msgEl.querySelector('.chat-admin-actions');
-          if (adminActions) {
+        if (!viewsBtn && (isMsgMine || isAdminVerified)) {
+          const actionsWrap = msgEl.querySelector('.chat-msg-actions');
+          if (actionsWrap) {
             viewsBtn = document.createElement('button');
             viewsBtn.type = 'button';
-            viewsBtn.className = 'chat-admin-action-btn chat-views-btn';
+            viewsBtn.className = `chat-pill-btn chat-views-btn ${isMsgMine ? 'chat-my-views-btn' : ''}`;
             viewsBtn.dataset.id = msgId;
             viewsBtn.innerHTML = `
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -3454,14 +3514,23 @@ function initLiveSessionsAndChat() {
               </svg>
               <span class="chat-views-count">${count}</span>
             `;
-            adminActions.prepend(viewsBtn);
+            const adminActions = actionsWrap.querySelector('.chat-admin-actions');
+            if (adminActions) {
+              actionsWrap.insertBefore(viewsBtn, adminActions);
+            } else {
+              actionsWrap.appendChild(viewsBtn);
+            }
           }
         }
         if (viewsBtn) {
-          const countEl = viewsBtn.querySelector('.chat-views-count');
-          if (countEl) countEl.textContent = String(count);
-          viewsBtn.title = `Seen by ${count} passenger${count === 1 ? '' : 's'} (Click for details)`;
-          viewsBtn.setAttribute('aria-label', `${count} views`);
+          if (!isMsgMine && !isAdminVerified) {
+            viewsBtn.remove();
+          } else {
+            const countEl = viewsBtn.querySelector('.chat-views-count');
+            if (countEl) countEl.textContent = String(count);
+            viewsBtn.title = `Seen by ${count} passenger${count === 1 ? '' : 's'} (Click for details)`;
+            viewsBtn.setAttribute('aria-label', `${count} views`);
+          }
         }
       }
     }
@@ -3488,15 +3557,16 @@ function initLiveSessionsAndChat() {
     if (textEl) textEl.textContent = msgText || '';
 
     const entries = (viewsData && typeof viewsData === 'object') ? Object.entries(viewsData) : [];
-    entries.sort((a, b) => {
+    const validEntries = isAdminVerified ? entries : entries.filter(([sessId]) => sessId !== mySessionId);
+    validEntries.sort((a, b) => {
       const tA = (a[1] && typeof a[1] === 'object' && a[1].t) ? Number(a[1].t) : 0;
       const tB = (b[1] && typeof b[1] === 'object' && b[1].t) ? Number(b[1].t) : 0;
       return tB - tA;
     });
 
-    const count = entries.length;
+    const count = validEntries.length;
     if (subtitleEl) {
-      subtitleEl.textContent = count === 1 ? 'Seen by 1 passenger' : `Seen by ${count} passengers`;
+      subtitleEl.textContent = count === 0 ? 'No views yet' : (count === 1 ? 'Seen by 1 passenger' : `Seen by ${count} passengers`);
     }
     if (totalBadge) {
       totalBadge.textContent = count === 1 ? '1 view' : `${count} views`;
@@ -3508,14 +3578,14 @@ function initLiveSessionsAndChat() {
         <div class="chat-views-empty">
           <span class="chat-views-empty-icon" aria-hidden="true">👁️</span>
           <p class="chat-views-empty-title">No views recorded yet</p>
-          <p class="chat-views-empty-sub">When passengers view this message in chat, they will show up here live.</p>
+          <p class="chat-views-empty-sub">When other passengers view this message in chat, their read receipts will appear here in real time.</p>
         </div>
       `;
       return;
     }
 
     let html = '';
-    entries.forEach(([sessId, item]) => {
+    validEntries.forEach(([sessId, item]) => {
       const isMeViewer = sessId === mySessionId;
       let name = 'Passenger';
       let gender = 'M';
@@ -3569,6 +3639,12 @@ function initLiveSessionsAndChat() {
     activeViewsModalMsgId = msgId;
 
     const msgEl = chatMessagesContainer?.querySelector(`.chat-msg-row[data-id="${msgId}"], .chat-msg[data-id="${msgId}"]`);
+    const isOwner = msgEl ? (msgEl.classList.contains('is-me') || (msgId && getMySentMessageIds().has(msgId))) : (msgId && getMySentMessageIds().has(msgId));
+    if (!isAdminVerified && !isOwner) {
+      notify('You can only view read receipts for your own messages.');
+      return;
+    }
+
     let senderName = msgEl?.querySelector('.chat-sender-name')?.textContent || 'Passenger';
     let msgText = msgEl?.querySelector('.chat-msg-text')?.textContent;
     if (!msgText) {
@@ -3702,7 +3778,7 @@ function initLiveSessionsAndChat() {
       chatEmptyState.style.display = 'none';
     }
 
-    const isMe = data.session === mySessionId;
+    const isMe = isMyMessage(data, msgId);
     const isVerified = Boolean(
       (data.isAdmin === true && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH)) ||
       (senderName.toLowerCase() === 'admin' && (data.adminToken === ADMIN_PASSKEY_HASH || data.adminKey === ADMIN_PASSKEY_HASH || data.isAdmin === true)) ||
@@ -3804,7 +3880,8 @@ function initLiveSessionsAndChat() {
     const initialViews = (data.views && typeof data.views === 'object')
       ? data.views
       : ((typeof messageViewsData !== 'undefined' && messageViewsData.get(msgId)) || {});
-    const viewCount = Object.keys(initialViews).length;
+    const initialEntries = Object.entries(initialViews);
+    const viewCount = isAdminVerified ? initialEntries.length : initialEntries.filter(([sId]) => sId !== mySessionId).length;
     if (typeof messageViewsData !== 'undefined') {
       messageViewsData.set(msgId, initialViews);
     }
@@ -3837,14 +3914,16 @@ function initLiveSessionsAndChat() {
             <span class="chat-pill-icon">↰</span>
             <span>Reply</span>
           </button>
+          ${(isMe || isAdminVerified) ? `
+          <button type="button" class="chat-pill-btn chat-views-btn ${isMe ? 'chat-my-views-btn' : ''}" data-id="${escapeHtml(msgId)}" title="Seen by ${viewCount} passenger${viewCount === 1 ? '' : 's'} (Click for details)" aria-label="${viewCount} views">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span class="chat-views-count">${viewCount}</span>
+          </button>
+          ` : ''}
           <div class="chat-admin-actions">
-            <button type="button" class="chat-admin-action-btn chat-views-btn" data-id="${escapeHtml(msgId)}" title="Seen by ${viewCount} passenger${viewCount === 1 ? '' : 's'} (Click for details)" aria-label="${viewCount} views">
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-              <span class="chat-views-count">${viewCount}</span>
-            </button>
             <button type="button" class="chat-admin-action-btn chat-pin-btn ${isPinned ? 'is-pinned' : ''}" data-id="${escapeHtml(msgId)}" title="${isPinned ? 'Unpin message' : 'Pin message'}" aria-label="Pin message">
               <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6l.8.8.8-.8v-6H18v-2l-2-2z"/></svg>
             </button>
@@ -3862,8 +3941,8 @@ function initLiveSessionsAndChat() {
 
     chatMessagesContainer.appendChild(msgEl);
 
-    // Record view for this client
-    if (isMe || isChatOpen() || isLive) {
+    // Record view for this client (for other passengers' messages only)
+    if (!isMe && (isChatOpen() || isLive)) {
       if (typeof queueMessageView === 'function') {
         queueMessageView(msgId);
       }
@@ -3979,14 +4058,16 @@ function initLiveSessionsAndChat() {
         return;
       }
 
-      // 4. Admin message views details
+      // 4. Message views details (Author of message or Admin)
       const viewsBtn = e.target.closest('.chat-views-btn');
       if (viewsBtn) {
-        if (!isAdminVerified) {
-          notify('Admin authorization required.');
+        const msgId = viewsBtn.getAttribute('data-id');
+        const msgRow = viewsBtn.closest('.chat-msg-row, .chat-msg');
+        const isOwner = msgRow ? (msgRow.classList.contains('is-me') || (msgId && getMySentMessageIds().has(msgId))) : false;
+        if (!isAdminVerified && !isOwner) {
+          notify('You can only view read receipts for your own messages.');
           return;
         }
-        const msgId = viewsBtn.getAttribute('data-id');
         if (msgId && typeof showChatMessageViewsDetails === 'function') {
           showChatMessageViewsDetails(msgId);
         }
@@ -4373,6 +4454,7 @@ function initLiveSessionsAndChat() {
           text: text || '',
           gender: gender || 'M',
           session: mySessionId,
+          deviceId: myDeviceId,
           timestamp: serverTimestamp(),
           trackThumb: trackThumb,
           trackTitle: trackTitle
@@ -4397,6 +4479,9 @@ function initLiveSessionsAndChat() {
           payload.adminToken = ADMIN_PASSKEY_HASH;
         }
         return push(messagesRef, payload).then((res) => {
+          if (res && res.key) {
+            recordMySentMessageId(res.key);
+          }
           autoPruneOldMessages();
           return res;
         });
