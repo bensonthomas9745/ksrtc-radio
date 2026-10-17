@@ -369,6 +369,8 @@ let currentBgMode = (() => {
   }
 })();
 
+const bgModeToggleBtn = $('bg-mode-toggle');
+
 function setBgMode(mode, persist = true) {
   currentBgMode = mode === 'photo' ? 'photo' : 'video';
   if (persist) {
@@ -382,11 +384,25 @@ function setBgMode(mode, persist = true) {
     app.classList.toggle('is-photo-bg', isPhoto);
   }
 
+  if (bgModeToggleBtn) {
+    bgModeToggleBtn.setAttribute(
+      'title',
+      isPhoto ? 'Background: Photo (Click to switch to Video)' : 'Background: Video (Click to switch to Photo)'
+    );
+    bgModeToggleBtn.setAttribute(
+      'aria-label',
+      isPhoto ? 'Switch to Video background' : 'Switch to Photo background'
+    );
+    const videoIcon = bgModeToggleBtn.querySelector('[data-mode="video"]');
+    const photoIcon = bgModeToggleBtn.querySelector('[data-mode="photo"]');
+    if (videoIcon) videoIcon.classList.toggle('is-active', !isPhoto);
+    if (photoIcon) photoIcon.classList.toggle('is-active', isPhoto);
+  }
+
   document.querySelectorAll('.bg-mode-icon-btn, .bg-mode-btn, .popover-bg-btn').forEach((btn) => {
     const btnMode = btn.dataset.mode;
     const isActive = btnMode === currentBgMode;
     btn.classList.toggle('is-active', isActive);
-    btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
   });
 
   if (isPhoto) {
@@ -405,17 +421,15 @@ function setBgMode(mode, persist = true) {
   }
 }
 
-document.addEventListener('click', (e) => {
-  const bgBtn = e.target.closest('.bg-mode-icon-btn, .bg-mode-btn, .popover-bg-btn');
-  if (bgBtn) {
+// Wherever you press on the button, it toggles
+if (bgModeToggleBtn) {
+  bgModeToggleBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const mode = bgBtn.dataset.mode;
-    if (mode) {
-      setBgMode(mode, true);
-      notify(mode === 'photo' ? 'Photo background enabled.' : 'Video background enabled.');
-    }
-  }
-});
+    const nextMode = currentBgMode === 'video' ? 'photo' : 'video';
+    setBgMode(nextMode, true);
+    notify(nextMode === 'photo' ? 'Photo background enabled.' : 'Video background enabled.');
+  });
+}
 
 setBgMode(currentBgMode, false);
 
